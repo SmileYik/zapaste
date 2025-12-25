@@ -41,6 +41,33 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const entities_mod = b.addModule("entities", .{
+        .root_source_file = b.path("src/entity/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
+    const pasta_mod = b.addModule("dao", .{
+        .root_source_file = b.path("src/pasta/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
+    // zap dependency
+    const zap = b.dependency("zap", .{
+        .target = target,
+        .optimize = optimize,
+        .openssl = false,
+    });
+
+    // zig-sqllite dependency
+    const sqlite = b.dependency("sqlite", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    pasta_mod.addImport("sqlite", sqlite.module("sqlite"));
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
@@ -79,6 +106,8 @@ pub fn build(b: *std.Build) void {
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
                 .{ .name = "zapaste", .module = mod },
+                .{ .name = "entities", .module = entities_mod},
+                .{ .name = "pasta", .module = pasta_mod}
             },
         }),
     });
@@ -135,12 +164,18 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
+    const pasta_tests = b.addTest(.{
+        .root_module = pasta_mod
+    });
+    const run_pasta_tests = b.addRunArtifact(pasta_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+    test_step.dependOn(&run_pasta_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
@@ -154,18 +189,7 @@ pub fn build(b: *std.Build) void {
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
 
-    // zap dependency
-    const zap = b.dependency("zap", .{
-        .target = target,
-        .optimize = optimize,
-        .openssl = false,
-    });
     exe.root_module.addImport("zap", zap.module("zap"));
-
-    // zig-sqllite dependency
-    const sqlite = b.dependency("sqlite", .{
-        .target = target,
-        .optimize = optimize,
-    });
     exe.root_module.addImport("sqlite", sqlite.module("sqlite"));
+    
 }
