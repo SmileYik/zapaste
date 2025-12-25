@@ -32,20 +32,3 @@ pub fn main() !void {
         .workers = 1, // 1 worker enables sharing state between threads
     });
 }
-
-test "sqlite create table" {
-    std.debug.print("start test 111\n", .{});
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePastaDao = SqlitePastaDao {
-        .db = &db
-    };
-    var dao: PastaDao = sqldao.create();
-    try dao.create_table_if_not_exists();
-}

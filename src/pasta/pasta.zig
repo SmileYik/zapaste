@@ -1,28 +1,28 @@
 pub const Pasta = struct {
     /// id
-    id: ?u64,
+    id: ?u64 = null,
 
     /// name
-    name: ?[]u8,
+    name: ?[]const u8 = null,
 
     /// text content
-    content: ?[]u8,
-    content_type: ?[]u8,
+    content: ?[]const u8 = null,
+    content_type: ?[]const u8 = null,
 
     /// file ids 
-    attachements: ?[]u8,
-    private: ?bool,
-    read_only: ?bool,
-    editable: ?bool,
+    attachements: ?[]const u8 = null,
+    private: ?bool = null,
+    read_only: ?bool = null,
+    editable: ?bool = null,
     
-    has_password: ?bool,
-    password: ?[]u8,
+    has_password: ?bool = null,
+    password: ?[]const u8 = null,
 
-    read_count: ?u64,
-    burn_after_reads: ?u64,
-    latest_read_at: ?u64,
+    read_count: ?u64 = null,
+    burn_after_reads: ?u64 = null,
+    latest_read_at: ?u64 = null,
 
-    create_at: ?u64,
-    expiration_at: ?u64,
-    profiles: ?[]u8,
+    create_at: ?u64 = null,
+    expiration_at: ?u64 = null,
+    profiles: ?[]const u8 = null,
 };
