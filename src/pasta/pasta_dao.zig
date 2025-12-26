@@ -526,3 +526,25 @@ test "[SqlitePastaDao] update" {
         std.debug.print("modified id 12 error: {}\n", .{e});
     }
 }
+
+test "[SqlitePastaDao] test options" {
+    const Options = @import("common").Options;
+    const DaoType = @import("common").DaoType;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const options = try Options.init(allocator, .{
+        .dao_type = DaoType.Sqlite
+    });
+
+    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = options.sqlite_db.? };
+    var dao: PastaDao = sqldao.create();
+        if (dao.list_pastas(allocator, .{
+        .private = false
+    })) |pasta| {
+        std.debug.print("query all public list: {any}\n", .{pasta.?});
+    } else |e| {
+        std.debug.print("query all public list failed: {}\n", .{e});
+    }
+}

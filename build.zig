@@ -47,7 +47,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
-    const pasta_mod = b.addModule("dao", .{
+    const common_mod = b.addModule("common", .{
+        .root_source_file = b.path("src/common/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
+    const pasta_mod = b.addModule("pasta", .{
         .root_source_file = b.path("src/pasta/root.zig"),
         .target = target,
         .optimize = optimize
@@ -66,7 +72,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    common_mod.addImport("sqlite", sqlite.module("sqlite"));
+
     pasta_mod.addImport("sqlite", sqlite.module("sqlite"));
+    pasta_mod.addImport("zap", zap.module("zap"));
+    pasta_mod.addImport("common", common_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
