@@ -8,11 +8,12 @@ pub const PastaDao = struct {
     get_pasta_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Pasta,
     get_pasta_by_name_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Pasta,
     list_pastas_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Pasta) anyerror!?[]Pasta,
-    list_pastas_by_sql_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query_sql: []const u8) anyerror!?[]Pasta,
     delete_pasta_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!bool,
     delete_pasta_by_name_fn: *const fn (ptr: *anyopaque, name: []const u8) anyerror!bool,
     update_pasta_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Pasta) anyerror!?Pasta,
+    increase_read_count_fn: *const fn (ptr: *anyopaque, pasta: Pasta) anyerror!void,
     insert_pasta_fn: *const fn (ptr: *anyopaque, entity: Pasta) anyerror!?u64,
+    clean_pasta_fn: *const fn (ptr: *anyopaque) anyerror!void,
 
     pub fn create_table_if_not_exists(self: PastaDao) anyerror!void {
         return self.create_table_if_not_exists_fn(self.ptr);
@@ -30,10 +31,6 @@ pub const PastaDao = struct {
         return self.list_pastas_fn(self.ptr, allocator, query);
     }
 
-    pub fn list_pastas_by_sql(self: PastaDao, allocator: std.mem.Allocator, query_sql: []const u8) anyerror!?[]Pasta {
-        return self.list_pastas_by_sql_fn(self.ptr, allocator, query_sql);
-    }
-
     pub fn delete_pasta(self: PastaDao, id: u64) anyerror!bool {
         return self.delete_pasta_fn(self.ptr, id);
     }
@@ -46,9 +43,19 @@ pub const PastaDao = struct {
         return self.update_pasta_fn(self.ptr, allocator, entity);
     }
 
+    /// increase read count. allow pass name or id. id has higer priority.
+    pub fn increase_read_count(self: PastaDao, pasta: Pasta) !void {
+        return self.increase_read_count_fn(self.ptr, pasta);
+    }
+
     /// insert Pasta into table and return the id in the table.
     pub fn insert_pasta(self: PastaDao, entity: Pasta) anyerror!?u64 {
         return self.insert_pasta_fn(self.ptr, entity);
+    }
+
+    /// clean pasta includes burn_after_reads and expirations.
+    pub fn clean_pasta(self: PastaDao) !void {
+        return self.clean_pasta_fn(self.ptr);
     }
 };
 
@@ -176,11 +183,12 @@ pub const SqlitePastaDao = struct {
             .get_pasta_fn = get_pasta,
             .get_pasta_by_name_fn = get_pasta_by_name,
             .list_pastas_fn = list_pastas,
-            .list_pastas_by_sql_fn = list_pastas_by_sql,
             .delete_pasta_fn = delete_pasta,
             .delete_pasta_by_name_fn = delete_pasta_by_name,
             .update_pasta_fn = update_pasta,
+            .increase_read_count_fn = increase_read_count,
             .insert_pasta_fn = insert_pasta,
+            .clean_pasta_fn = clean_pasta
         };
     }
 
@@ -231,28 +239,6 @@ pub const SqlitePastaDao = struct {
         );
     }
 
-    fn list_pastas_by_sql(
-        ptr: *anyopaque, 
-        allocator: std.mem.Allocator, 
-        query_sql: []const u8
-    ) anyerror!?[]Pasta {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
-        const temp_alloc = arena.allocator();
-
-        var stmt = try self.db.prepareDynamic(
-            try std.fmt.allocPrint(temp_alloc, "{s} {s}", .{SELECT_SQL, query_sql})
-        );
-        defer stmt.deinit();
-        return try stmt.all(
-            Pasta,
-            allocator,
-            .{},
-            .{},
-        );
-    }
-
     fn delete_pasta(ptr: *anyopaque, id: u64) anyerror!bool {
         const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
         const sql = "DELETE FROM pasta WHERE pasta.id = ?";
@@ -271,6 +257,19 @@ pub const SqlitePastaDao = struct {
         return true;
     }
 
+    fn clean_pasta(ptr: *anyopaque) !void {
+        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+        const sql =
+            \\DELETE FROM pasta WHERE
+            \\(burn_after_reads IS NOT NULL AND read_count > burn_after_reads)
+            \\OR
+            \\(expiration_at IS NOT NULL AND expiration_at > ?)
+        ;
+        var stmt = try self.db.prepare(sql);
+        defer stmt.deinit();
+        try stmt.exec(.{}, .{ @as(u64, @intCast(std.time.timestamp())) });
+    }
+
     fn update_pasta(ptr: *anyopaque, allocator: std.mem.Allocator, entity: Pasta) anyerror!?Pasta {
         const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
         if (entity.id) |id| {
@@ -281,6 +280,41 @@ pub const SqlitePastaDao = struct {
             return try get_pasta(ptr, allocator, id);
         }
         return entity;
+    }
+
+    fn increase_read_count(ptr: *anyopaque, pasta: Pasta) !void {
+        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const temp_gpa = arena.allocator();
+
+        var sql: ?[]u8 = null;
+        if (pasta.id) |id| {
+            sql = try std.fmt.allocPrint(
+                temp_gpa, 
+                "UPDATE pasta SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE id = {}", 
+                .{
+                    @as(u64, @intCast(std.time.timestamp())),
+                    id
+                }
+            );
+        } else if (pasta.name) |name| {
+            sql = try std.fmt.allocPrint(
+                temp_gpa, 
+                "UPDATE pasta SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE name = '{s}'", 
+                .{
+                    @as(u64, @intCast(std.time.timestamp())),
+                    name
+                }
+            );
+        } else {
+            sql = null;
+        }
+        if (sql) |s| {
+            var stmt = try self.db.prepareDynamic(s);
+            defer stmt.deinit();
+            try stmt.exec(.{}, .{});
+        }
     }
 
     fn insert_pasta(ptr: *anyopaque, entity: Pasta) anyerror!?u64 {
