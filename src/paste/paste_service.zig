@@ -132,7 +132,7 @@ fn split_static_file(comptime filename: []const u8) []const []const u8 {
         iter.reset();
         while (iter.next()) |line| {
             const trimed = std.mem.trim(u8, line, " \r\t");
-             if (trimed.len > 0) {
+            if (trimed.len > 0) {
                 result[i] = trimed;
                 i += 1;
             }

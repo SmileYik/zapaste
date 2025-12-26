@@ -1,0 +1,211 @@
+const std = @import("std");
+const zap = @import("zap");
+const Router = zap.Router;
+
+/// This router similiar with zap.Router, but only allow variable path.
+pub const VariableRouter = struct {
+
+    pub const Options = struct {
+        not_found: ?zap.HttpRequestFn = null
+    };
+
+    const VariablePath = struct {
+        paths: []const []const u8,
+        variable_idxes: []const usize,
+
+        /// initialize a variable path. use `:` to mark a variable.
+        /// 
+        /// for example: `/user/:id` contains `id` variable, it's matches path: `/user/tom`, then the `id` value is `tom`  
+        /// 
+        /// you also can mark multiple variables in one path, just like `/user/:username/detail/:id`
+        pub fn init(comptime path: []const u8) VariablePath {
+            const count, const variable_count = comptime counts: {
+                var iter = std.mem.splitSequence(u8, path, "/");
+                var c_count: usize = 0;
+                var c_variable_count: usize = 0;
+                while (iter.next()) |line| {
+                    c_count += 1;
+                    if (std.mem.startsWith(u8, line, ":")) {
+                        c_variable_count += 1;
+                    }
+                }
+                break :counts  .{ c_count, c_variable_count };
+            };
+            
+            const array, const variables = comptime blk: {
+                var result: [count][]const u8 = undefined;
+                var variable_idxes: [variable_count]usize = undefined;
+                var i: usize = 0;
+                var j: usize = 0;
+                
+                var iter = std.mem.splitSequence(u8, path, "/");
+                while (iter.next()) |line| {
+                    result[i] = line;
+                    if (std.mem.startsWith(u8, line, ":")) {
+                        variable_idxes[j] = i;
+                        j += 1;
+                    }
+                    i += 1;
+                }
+                break :blk . { result, variable_idxes };
+            };
+            return .{
+                .paths = &array,
+                .variable_idxes = &variables
+            };
+        }
+
+        /// matches path
+        pub fn matches(self: *const VariablePath, path: []const u8) bool {
+            var iter = std.mem.splitSequence(u8, path, "/");
+            var variable_idx: usize = 0;
+            var idx: usize = 0;
+            while (iter.next()) |line| {
+                if (idx == self.paths.len) {
+                    return false;
+                } else if (variable_idx < self.variable_idxes.len and idx == self.variable_idxes[variable_idx]) {
+                    variable_idx += 1;
+                } else if (!std.mem.eql(u8, line, self.paths[idx])) {
+                    return false;
+                }
+                idx += 1;
+            }
+            return idx == self.paths.len;
+        }
+
+        /// get path variables. if it's not matches then will return null.
+        pub fn get_variables(self: *const VariablePath, gpa: std.mem.Allocator, path: []const u8) !?std.StringHashMap([]const u8) {
+            if (!self.matches(path)) return null;
+            var variables = std.StringHashMap([]const u8).init(gpa);
+            var iter = std.mem.splitSequence(u8, path, "/");
+            var variable_idx: usize = 0;
+            var idx: usize = 0;
+            while (iter.next()) |line| {
+                if (self.variable_idxes.len == variable_idx) break;
+                const v_idx = self.variable_idxes[variable_idx];
+                if (idx == v_idx) {
+                    variable_idx += 1;
+                    try variables.put(self.paths[idx][1..], line);
+                }
+                idx += 1;
+            }
+            return variables;
+        }
+    };
+    
+    const CallbackType = enum {
+        bound,
+        unbound
+    };
+
+    const Callback = union (CallbackType) {
+        bound: struct {
+            instance: usize,
+            handler: usize
+        },
+        unbound: usize
+    };
+
+    const BoundHandler = *fn (*const anyopaque, path_variables: std.StringHashMap([]const u8), zap.Request) anyerror!void;
+    const UnboundHandler = *fn (path_variables: std.StringHashMap([]const u8), zap.Request) anyerror!void;
+
+    const Record = struct {
+        path: VariablePath,
+        callback: Callback
+    };
+
+    routes: std.ArrayList(Record),
+    not_found: ?zap.HttpRequestFn,
+
+    var _instance: *VariableRouter = undefined;
+
+    pub fn init(allocator: std.mem.Allocator, options: Options) !VariableRouter {
+        return .{
+            .routes = try std.ArrayList(Record).initCapacity(allocator, 16),
+            .not_found = options.not_found,
+        };
+    }
+
+    pub fn handle_func_unbound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, h: anytype) !void {
+        if (path.len == 0) {
+            return;
+        }
+
+        try self.routes.append(allocator, .{
+            .path = VariablePath.init(path),
+            .callback = .{
+                .unbound = @intFromPtr(h)
+            }
+        });
+    }
+
+    pub fn handle_func_bound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, instance: *const anyopaque, h: anytype) !void {
+        if (path.len == 0) {
+            return;
+        }
+
+        try self.routes.append(allocator, .{
+            .path = VariablePath.init(path),
+            .callback = .{
+                .bound = .{
+                    .instance = @intFromPtr(instance),
+                    .handler = @intFromPtr(h)
+                }
+            }
+        });
+    }
+
+    pub fn deinit(self: *Router) void {
+        self.routes.deinit();
+    }
+
+    pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
+        _instance = self;
+        return zap_on_request;
+    }
+
+    fn zap_on_request(r: zap.Request) !void {
+        return serve(_instance, r);
+    }
+
+    fn serve(self: *VariableRouter, r: zap.Request) !void {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const gpa = arena.allocator();
+
+        const path = r.path orelse "/";
+        var target: ?Record = null;
+        var path_variables: ?std.StringHashMap([]const u8) = null;
+        for (self.routes.items) |route| {
+            if (try route.path.get_variables(gpa, path)) |map| {
+                path_variables = map;
+                target = route;
+                break;
+            }
+        }
+
+        if (target) |record| {
+            switch (record.callback) {
+                .bound => |b| {
+                    try @call(
+                        .auto, 
+                        @as(BoundHandler, @ptrFromInt(b.handler)), 
+                        .{ @as(*anyopaque, @ptrFromInt(b.instance)), path_variables.?, r }
+                    );
+                },
+                .unbound => |h| {
+                    try @call(
+                        .auto,
+                        @as(UnboundHandler, @ptrFromInt(h)),
+                        .{ path_variables.?, r }
+                    );
+                },
+            }
+            path_variables.?.deinit();
+        } else if (self.not_found) |handler| {
+            try handler(r);
+        } else {
+            r.setStatus(.not_found);
+        }
+    }
+};
