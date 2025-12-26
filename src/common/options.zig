@@ -19,7 +19,7 @@ pub const Options = struct {
         };
     }
 
-    pub fn init(gpa: Allocator, opt: Options) !Options {
+    pub fn init(gpa: Allocator, opt: Options) anyerror!Options {
         var options = opt;
         options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
         if (options.dao_type == DaoType.Sqlite) {

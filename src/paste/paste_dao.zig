@@ -534,9 +534,13 @@ test "[SqlitePasteDao] test options" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const options = try Options.init(allocator, .{
-        .dao_type = DaoType.Sqlite
-    });
+    const options = Options.init(allocator, .{
+        .dao_type = DaoType.Sqlite,
+        .work_dir = "./"
+    }) catch |e| {
+        std.debug.print("test options failed, cannot init options: {}", .{e});
+        return;
+    };
 
     var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = options.sqlite_db.? };
     var dao: PasteDao = sqldao.create();
