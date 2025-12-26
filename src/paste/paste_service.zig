@@ -1,19 +1,19 @@
-const PastaDao = @import("pasta_dao.zig").PastaDao;
-const Pasta = @import("pasta.zig").Pasta;
+const PasteDao = @import("paste_dao.zig").PasteDao;
+const Paste = @import("paste.zig").Paste;
 const std = @import("std");
 const Random = std.Random;
 const Allocator = std.mem.Allocator;
 
-pub const PastaService = struct {
+pub const PasteService = struct {
     const Self = @This();
 
-    dao: ?*PastaDao = null,
+    dao: ?*PasteDao = null,
     prng: ?Random.DefaultPrng = null,
     animal_names: []const []const u8 = split_static_file("animals.txt"),
     animal_adjectives: []const []const u8 = split_static_file("adjectives.txt"),
 
-    /// create pasta service instance. dao instance is required, others all optional.
-    pub fn create(config: Self) PastaService {
+    /// create paste service instance. dao instance is required, others all optional.
+    pub fn create(config: Self) PasteService {
         return .{
             .dao = config.dao,
             .prng = Random.DefaultPrng.init(@intCast(std.time.timestamp())),
@@ -29,12 +29,12 @@ pub const PastaService = struct {
         return try std.fmt.allocPrint(gpa, "{s}-{s}", .{ adjective, name });
     }
 
-    pub fn create_pasta(self: *Self, gpa: Allocator, pasta: Pasta) !Pasta {
+    pub fn create_paste(self: *Self, gpa: Allocator, paste: Paste) !Paste {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
-        var entity: Pasta = try pasta.dupe(temp_gpa);
+        var entity: Paste = try paste.dupe(temp_gpa);
         entity.name = entity.name orelse try self.random_animal_name(temp_gpa);
         entity.profiles = entity.profiles orelse "{}";
         entity.create_at = @intCast(std.time.timestamp());
@@ -42,7 +42,7 @@ pub const PastaService = struct {
 
         const retry = 3;
         for (0..retry) |i| {
-            const result = self.dao.?.insert_pasta(entity) catch |err| {
+            const result = self.dao.?.insert_paste(entity) catch |err| {
                 if (retry == i + 1) {
                     return err;                    
                 }
@@ -56,14 +56,14 @@ pub const PastaService = struct {
         return try entity.dupe(gpa);
     }
 
-    /// read pasta by name. will check password.  
-    /// if password is correct, it's will increased pasta read count and clean expired pastas. 
-    pub fn read_pasta(self: *Self, gpa: Allocator, query: Pasta) ?Pasta {
+    /// read paste by name. will check password.  
+    /// if password is correct, it's will increased paste read count and clean expired pastes. 
+    pub fn read_paste(self: *Self, gpa: Allocator, query: Paste) ?Paste {
         if (query.name == null) {
             return null;
         }
-        const pasta = self.find_pasta(gpa, query.name.?);
-        if (pasta) |p| {
+        const paste = self.find_paste(gpa, query.name.?);
+        if (paste) |p| {
             var success: bool = true;
             if (p.has_password != null and p.has_password.?) {
                 if (!std.mem.eql(u8, p.password orelse "", query.password orelse "")) {
@@ -72,7 +72,7 @@ pub const PastaService = struct {
             }
             if (success) {
                 self.increase_read_count(p) catch |e| {
-                    std.log.debug("[PastaService] failed increase read count: {}", .{e});
+                    std.log.debug("[PasteService] failed increase read count: {}", .{e});
                 };
                 return p;
             }
@@ -80,38 +80,38 @@ pub const PastaService = struct {
         return null;
     }
 
-    pub fn find_pasta(self: *Self, gpa: Allocator, pasta_name: []const u8) ?Pasta {
-        const pasta = self.dao.?.get_pasta_by_name(gpa, pasta_name) catch |err| {
-            std.debug.print("[PastaService] failed to find a pasta by name {s}: {}", .{pasta_name, err});
+    pub fn find_paste(self: *Self, gpa: Allocator, paste_name: []const u8) ?Paste {
+        const paste = self.dao.?.get_paste_by_name(gpa, paste_name) catch |err| {
+            std.debug.print("[PasteService] failed to find a paste by name {s}: {}", .{paste_name, err});
             return null;
         };
-        return pasta;
+        return paste;
     }
 
-    pub fn update_pasta(self: *Self, gpa: Allocator, pasta: Pasta) !?Pasta {
+    pub fn update_paste(self: *Self, gpa: Allocator, paste: Paste) !?Paste {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
-        var entity = try pasta.dupe(temp_gpa);
+        var entity = try paste.dupe(temp_gpa);
         if (entity.id == null) {
-            var found: ?Pasta = null;
+            var found: ?Paste = null;
             if (entity.name) |name| {
-                if (self.find_pasta(temp_gpa, name)) |f| {
+                if (self.find_paste(temp_gpa, name)) |f| {
                     found = f;
                 }
             }
             if (found) |f| {
                 entity.id = f.id;
             } else {
-                return error.CannotFindPasta;
+                return error.CannotFindPaste;
             }
         }
         entity.name = null;
-        return try self.dao.?.update_pasta(gpa, entity);
+        return try self.dao.?.update_paste(gpa, entity);
     }
 
-    pub fn increase_read_count(self: *Self, pasta: Pasta) !void {
-        try self.dao.?.increase_read_count(pasta);
+    pub fn increase_read_count(self: *Self, paste: Paste) !void {
+        try self.dao.?.increase_read_count(paste);
     }
 };
 
@@ -142,10 +142,10 @@ fn split_static_file(comptime filename: []const u8) []const []const u8 {
     return &array;
 }
 
-const SqlitePastaDao = @import("pasta_dao.zig").SqlitePastaDao;
+const SqlitePasteDao = @import("paste_dao.zig").SqlitePasteDao;
 const sqlite = @import("sqlite");
 test "test random animal name" {
-    var s = PastaService.create(.{});
+    var s = PasteService.create(.{});
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const temp_alloc = arena.allocator();
@@ -154,7 +154,7 @@ test "test random animal name" {
     std.debug.print("random animal name: {s}\n", .{try s.random_animal_name(temp_alloc)});
 }
 
-test "create a pasta" {
+test "create a paste" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -163,22 +163,22 @@ test "create a pasta" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
-    const result = service.create_pasta(gpa, .{
+    const result = service.create_paste(gpa, .{
         .content = "new content without name"
     }) catch |err| {
-        std.debug.print("create a pasta whitout name failed: {}\n", .{err});
+        std.debug.print("create a paste whitout name failed: {}\n", .{err});
         return;
     };
-    std.debug.print("create a pasta whitout name: {}\n", .{result});
+    std.debug.print("create a paste whitout name: {}\n", .{result});
 }
 
-test "create a pasta with special name" {
+test "create a paste with special name" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -187,23 +187,23 @@ test "create a pasta with special name" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
-    const result = service.create_pasta(gpa, .{
-        .name = "i am the pasta name",
+    const result = service.create_paste(gpa, .{
+        .name = "i am the paste name",
         .content = "new content 2"
     }) catch |err| {
-        std.debug.print("create a pasta failed: {}\n", .{err});
+        std.debug.print("create a paste failed: {}\n", .{err});
         return;
     };
-    std.debug.print("create a pasta: {}\n", .{result});
+    std.debug.print("create a paste: {}\n", .{result});
 }
 
-test "update a pasta" {
+test "update a paste" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -212,23 +212,23 @@ test "update a pasta" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
-    const result = service.update_pasta(gpa, .{
+    const result = service.update_paste(gpa, .{
         .id = 101,
         .read_count = 99999
     }) catch |err| {
-        std.debug.print("update a pasta failed: {}\n", .{err});
+        std.debug.print("update a paste failed: {}\n", .{err});
         return;
     };
-    std.debug.print("update a pasta: {}\n", .{result.?});
+    std.debug.print("update a paste: {}\n", .{result.?});
 }
 
-test "update a pasta with name" {
+test "update a paste with name" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -237,20 +237,20 @@ test "update a pasta with name" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
-    const result = service.update_pasta(gpa, .{
-        .name = "i am the pasta name",
+    const result = service.update_paste(gpa, .{
+        .name = "i am the paste name",
         .read_count = 100000
     }) catch |err| {
-        std.debug.print("update a pasta with name failed: {}\n", .{err});
+        std.debug.print("update a paste with name failed: {}\n", .{err});
         return;
     };
-    std.debug.print("update a pasta with name: {}\n", .{result.?});
+    std.debug.print("update a paste with name: {}\n", .{result.?});
 }
 
 test "increase read count" {
@@ -262,9 +262,9 @@ var db = try sqlite.Db.init(.{
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     _ = arena.allocator();
@@ -282,9 +282,9 @@ var db = try sqlite.Db.init(.{
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
@@ -293,13 +293,13 @@ var db = try sqlite.Db.init(.{
         try service.increase_read_count(.{
             .name = "test-66"
         });
-        const result = service.find_pasta(gpa, "test-66");
+        const result = service.find_paste(gpa, "test-66");
 
         std.debug.print("increase read count with name: {}\n", .{result.?});
     }
 }
 
-test "read pasta" {
+test "read paste" {
 var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -308,17 +308,17 @@ var db = try sqlite.Db.init(.{
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    var service: PastaService = PastaService.create(.{ .dao = &dao });
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    var service: PasteService = PasteService.create(.{ .dao = &dao });
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
 
     for (0..100) |_| {
-        const result = service.read_pasta(gpa, .{
+        const result = service.read_paste(gpa, .{
             .name = "test-56"
         });
-        std.debug.print("read pasta: {}\n", .{result.?});
+        std.debug.print("read paste: {}\n", .{result.?});
     }
 }

@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
     // to our consumers. We must give it a name because a Zig package can expose
     // multiple modules and consumers will need to be able to specify which
     // module they want to access.
-    const mod = b.addModule("zapasta", .{
+    const mod = b.addModule("zapaste", .{
         // The root source file is the "entry point" of this module. Users of
         // this module will only be able to access public declarations contained
         // in this file, which means that if you have declarations that you
@@ -53,8 +53,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
-    const pasta_mod = b.addModule("pasta", .{
-        .root_source_file = b.path("src/pasta/root.zig"),
+    const paste_mod = b.addModule("paste", .{
+        .root_source_file = b.path("src/paste/root.zig"),
         .target = target,
         .optimize = optimize
     });
@@ -74,9 +74,9 @@ pub fn build(b: *std.Build) void {
 
     common_mod.addImport("sqlite", sqlite.module("sqlite"));
 
-    pasta_mod.addImport("sqlite", sqlite.module("sqlite"));
-    pasta_mod.addImport("zap", zap.module("zap"));
-    pasta_mod.addImport("common", common_mod);
+    paste_mod.addImport("sqlite", sqlite.module("sqlite"));
+    paste_mod.addImport("zap", zap.module("zap"));
+    paste_mod.addImport("common", common_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -95,7 +95,7 @@ pub fn build(b: *std.Build) void {
     // If neither case applies to you, feel free to delete the declaration you
     // don't need and to put everything under a single module.
     const exe = b.addExecutable(.{
-        .name = "zapasta",
+        .name = "zapaste",
         .root_module = b.createModule(.{
             // b.createModule defines a new module just like b.addModule but,
             // unlike b.addModule, it does not expose the module to consumers of
@@ -110,14 +110,14 @@ pub fn build(b: *std.Build) void {
             // List of modules available for import in source files part of the
             // root module.
             .imports = &.{
-                // Here "zapasta" is the name you will use in your source code to
-                // import this module (e.g. `@import("zapasta")`). The name is
+                // Here "zapaste" is the name you will use in your source code to
+                // import this module (e.g. `@import("zapaste")`). The name is
                 // repeated because you are allowed to rename your imports, which
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
-                .{ .name = "zapasta", .module = mod },
+                .{ .name = "zapaste", .module = mod },
                 .{ .name = "entities", .module = entities_mod},
-                .{ .name = "pasta", .module = pasta_mod}
+                .{ .name = "paste", .module = paste_mod}
             },
         }),
     });
@@ -174,10 +174,10 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
-    const pasta_tests = b.addTest(.{
-        .root_module = pasta_mod
+    const paste_tests = b.addTest(.{
+        .root_module = paste_mod
     });
-    const run_pasta_tests = b.addRunArtifact(pasta_tests);
+    const run_paste_tests = b.addRunArtifact(paste_tests);
 
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
@@ -185,7 +185,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
-    test_step.dependOn(&run_pasta_tests.step);
+    test_step.dependOn(&run_paste_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

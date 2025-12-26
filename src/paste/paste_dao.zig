@@ -1,67 +1,67 @@
 const std = @import("std");
-const Pasta = @import("pasta.zig").Pasta;
+const Paste = @import("paste.zig").Paste;
 const sqlite = @import("sqlite");
 
-pub const PastaDao = struct {
+pub const PasteDao = struct {
     ptr: *anyopaque,
     create_table_if_not_exists_fn: *const fn (ptr: *anyopaque) anyerror!void,
-    get_pasta_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Pasta,
-    get_pasta_by_name_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Pasta,
-    list_pastas_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Pasta) anyerror!?[]Pasta,
-    delete_pasta_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!bool,
-    delete_pasta_by_name_fn: *const fn (ptr: *anyopaque, name: []const u8) anyerror!bool,
-    update_pasta_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Pasta) anyerror!?Pasta,
-    increase_read_count_fn: *const fn (ptr: *anyopaque, pasta: Pasta) anyerror!void,
-    insert_pasta_fn: *const fn (ptr: *anyopaque, entity: Pasta) anyerror!?u64,
-    clean_pasta_fn: *const fn (ptr: *anyopaque) anyerror!void,
+    get_paste_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Paste,
+    get_paste_by_name_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste,
+    list_pastes_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste,
+    delete_paste_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!bool,
+    delete_paste_by_name_fn: *const fn (ptr: *anyopaque, name: []const u8) anyerror!bool,
+    update_paste_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste,
+    increase_read_count_fn: *const fn (ptr: *anyopaque, paste: Paste) anyerror!void,
+    insert_paste_fn: *const fn (ptr: *anyopaque, entity: Paste) anyerror!?u64,
+    clean_paste_fn: *const fn (ptr: *anyopaque) anyerror!void,
 
-    pub fn create_table_if_not_exists(self: PastaDao) anyerror!void {
+    pub fn create_table_if_not_exists(self: PasteDao) anyerror!void {
         return self.create_table_if_not_exists_fn(self.ptr);
     }
 
-    pub fn get_pasta(self: PastaDao, allocator: std.mem.Allocator, id: u64) anyerror!?Pasta {
-        return self.get_pasta_fn(self.ptr, allocator, id);
+    pub fn get_paste(self: PasteDao, allocator: std.mem.Allocator, id: u64) anyerror!?Paste {
+        return self.get_paste_fn(self.ptr, allocator, id);
     }
 
-    pub fn get_pasta_by_name(self: PastaDao, allocator: std.mem.Allocator, name: []const u8) anyerror!?Pasta {
-        return self.get_pasta_by_name_fn(self.ptr, allocator, name);
+    pub fn get_paste_by_name(self: PasteDao, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste {
+        return self.get_paste_by_name_fn(self.ptr, allocator, name);
     }
 
-    pub fn list_pastas(self: PastaDao, allocator: std.mem.Allocator, query: ?Pasta) anyerror!?[]Pasta {
-        return self.list_pastas_fn(self.ptr, allocator, query);
+    pub fn list_pastes(self: PasteDao, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste {
+        return self.list_pastes_fn(self.ptr, allocator, query);
     }
 
-    pub fn delete_pasta(self: PastaDao, id: u64) anyerror!bool {
-        return self.delete_pasta_fn(self.ptr, id);
+    pub fn delete_paste(self: PasteDao, id: u64) anyerror!bool {
+        return self.delete_paste_fn(self.ptr, id);
     }
 
-    pub fn delete_pasta_by_name(self: PastaDao, name: []const u8) anyerror!bool {
-        return self.delete_pasta_by_name_fn(self.ptr, name);
+    pub fn delete_paste_by_name(self: PasteDao, name: []const u8) anyerror!bool {
+        return self.delete_paste_by_name_fn(self.ptr, name);
     }
 
-    pub fn update_pasta(self: PastaDao, allocator: std.mem.Allocator, entity: Pasta) anyerror!?Pasta {
-        return self.update_pasta_fn(self.ptr, allocator, entity);
+    pub fn update_paste(self: PasteDao, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
+        return self.update_paste_fn(self.ptr, allocator, entity);
     }
 
     /// increase read count. allow pass name or id. id has higer priority.
-    pub fn increase_read_count(self: PastaDao, pasta: Pasta) !void {
-        return self.increase_read_count_fn(self.ptr, pasta);
+    pub fn increase_read_count(self: PasteDao, paste: Paste) !void {
+        return self.increase_read_count_fn(self.ptr, paste);
     }
 
-    /// insert Pasta into table and return the id in the table.
-    pub fn insert_pasta(self: PastaDao, entity: Pasta) anyerror!?u64 {
-        return self.insert_pasta_fn(self.ptr, entity);
+    /// insert Paste into table and return the id in the table.
+    pub fn insert_paste(self: PasteDao, entity: Paste) anyerror!?u64 {
+        return self.insert_paste_fn(self.ptr, entity);
     }
 
-    /// clean pasta includes burn_after_reads and expirations.
-    pub fn clean_pasta(self: PastaDao) !void {
-        return self.clean_pasta_fn(self.ptr);
+    /// clean paste includes burn_after_reads and expirations.
+    pub fn clean_paste(self: PasteDao) !void {
+        return self.clean_paste_fn(self.ptr);
     }
 };
 
-pub const SqlitePastaDao = struct {
+pub const SqlitePasteDao = struct {
     const CREATE_TABLE_SQL =
-        \\CREATE TABLE IF NOT EXISTS pasta (
+        \\CREATE TABLE IF NOT EXISTS paste (
         \\  id INTEGER PRIMARY KEY,
         \\  name TEXT NOT NULL UNIQUE,
         \\  content TEXT,
@@ -82,23 +82,23 @@ pub const SqlitePastaDao = struct {
     ;
     const SELECT_SQL =
         \\SELECT 
-        \\  pasta.id, 
-        \\  pasta.name, 
-        \\  pasta.content, 
-        \\  pasta.content_type, 
-        \\  pasta.attachements, 
-        \\  pasta.private, 
-        \\  pasta.read_only, 
-        \\  pasta.editable, 
-        \\  pasta.has_password, 
-        \\  pasta.password, 
-        \\  pasta.read_count, 
-        \\  pasta.burn_after_reads, 
-        \\  pasta.latest_read_at, 
-        \\  pasta.create_at, 
-        \\  pasta.expiration_at, 
-        \\  pasta.profiles 
-        \\FROM pasta
+        \\  paste.id, 
+        \\  paste.name, 
+        \\  paste.content, 
+        \\  paste.content_type, 
+        \\  paste.attachements, 
+        \\  paste.private, 
+        \\  paste.read_only, 
+        \\  paste.editable, 
+        \\  paste.has_password, 
+        \\  paste.password, 
+        \\  paste.read_count, 
+        \\  paste.burn_after_reads, 
+        \\  paste.latest_read_at, 
+        \\  paste.create_at, 
+        \\  paste.expiration_at, 
+        \\  paste.profiles 
+        \\FROM paste
     ;
     const QUERY_SQL = SELECT_SQL ++
         \\ WHERE
@@ -120,7 +120,7 @@ pub const SqlitePastaDao = struct {
         \\  (:profiles IS NULL OR profiles = :profiles)
     ;
     const INSERT_SQL =
-        \\INSERT INTO pasta (
+        \\INSERT INTO paste (
         \\  name, 
         \\  content, 
         \\  content_type, 
@@ -155,7 +155,7 @@ pub const SqlitePastaDao = struct {
         \\) RETURNING id
     ;
     const UPDATE_SQL = 
-        \\UPDATE pasta SET 
+        \\UPDATE paste SET 
         \\  name = COALESCE(:name, name),
         \\  content = COALESCE(:content, content),
         \\  content_type = COALESCE(:content_type, content_type),
@@ -176,35 +176,35 @@ pub const SqlitePastaDao = struct {
 
     db: *sqlite.Db,
 
-    pub fn create(self: *SqlitePastaDao) PastaDao {
+    pub fn create(self: *SqlitePasteDao) PasteDao {
         return .{
             .ptr = self,
             .create_table_if_not_exists_fn = create_table_if_not_exists,
-            .get_pasta_fn = get_pasta,
-            .get_pasta_by_name_fn = get_pasta_by_name,
-            .list_pastas_fn = list_pastas,
-            .delete_pasta_fn = delete_pasta,
-            .delete_pasta_by_name_fn = delete_pasta_by_name,
-            .update_pasta_fn = update_pasta,
+            .get_paste_fn = get_paste,
+            .get_paste_by_name_fn = get_paste_by_name,
+            .list_pastes_fn = list_pastes,
+            .delete_paste_fn = delete_paste,
+            .delete_paste_by_name_fn = delete_paste_by_name,
+            .update_paste_fn = update_paste,
             .increase_read_count_fn = increase_read_count,
-            .insert_pasta_fn = insert_pasta,
-            .clean_pasta_fn = clean_pasta
+            .insert_paste_fn = insert_paste,
+            .clean_paste_fn = clean_paste
         };
     }
 
     fn create_table_if_not_exists(ptr: *anyopaque) anyerror!void {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         try self.db.exec(CREATE_TABLE_SQL, .{}, .{});
     }
 
-    fn get_pasta(ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Pasta {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn get_paste(ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Paste {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
 
-        const query = SELECT_SQL ++ " WHERE pasta.id = ?";
+        const query = SELECT_SQL ++ " WHERE paste.id = ?";
         var stmt = try self.db.prepare(query);
         defer stmt.deinit();
         const row = try stmt.oneAlloc(
-            Pasta,
+            Paste,
             allocator,
             .{},
             .{ .id = id },
@@ -212,14 +212,14 @@ pub const SqlitePastaDao = struct {
         return row;
     }
 
-    fn get_pasta_by_name(ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Pasta {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn get_paste_by_name(ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
 
-        const query = SELECT_SQL ++ " WHERE pasta.name = ?";
+        const query = SELECT_SQL ++ " WHERE paste.name = ?";
         var stmt = try self.db.prepare(query);
         defer stmt.deinit();
         const row = try stmt.oneAlloc(
-            Pasta,
+            Paste,
             allocator,
             .{},
             .{ .name = name },
@@ -227,40 +227,40 @@ pub const SqlitePastaDao = struct {
         return row;
     }
 
-    fn list_pastas(ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Pasta) anyerror!?[]Pasta {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn list_pastes(ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         var stmt = try self.db.prepareDynamic(QUERY_SQL);
         defer stmt.deinit();
         return try stmt.all(
-            Pasta,
+            Paste,
             allocator,
             .{},
-            query orelse Pasta {},
+            query orelse Paste {},
         );
     }
 
-    fn delete_pasta(ptr: *anyopaque, id: u64) anyerror!bool {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
-        const sql = "DELETE FROM pasta WHERE pasta.id = ?";
+    fn delete_paste(ptr: *anyopaque, id: u64) anyerror!bool {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const sql = "DELETE FROM paste WHERE paste.id = ?";
         var stmt = try self.db.prepare(sql);
         defer stmt.deinit();
         try stmt.exec(.{}, .{id});
         return true;
     }
 
-    fn delete_pasta_by_name(ptr: *anyopaque, name: []const u8) anyerror!bool {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
-        const sql = "DELETE FROM pasta WHERE pasta.name = ?";
+    fn delete_paste_by_name(ptr: *anyopaque, name: []const u8) anyerror!bool {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const sql = "DELETE FROM paste WHERE paste.name = ?";
         var stmt = try self.db.prepare(sql);
         defer stmt.deinit();
         try stmt.exec(.{}, .{name});
         return true;
     }
 
-    fn clean_pasta(ptr: *anyopaque) !void {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn clean_paste(ptr: *anyopaque) !void {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         const sql =
-            \\DELETE FROM pasta WHERE
+            \\DELETE FROM paste WHERE
             \\(burn_after_reads IS NOT NULL AND read_count > burn_after_reads)
             \\OR
             \\(expiration_at IS NOT NULL AND expiration_at > ?)
@@ -270,38 +270,38 @@ pub const SqlitePastaDao = struct {
         try stmt.exec(.{}, .{ @as(u64, @intCast(std.time.timestamp())) });
     }
 
-    fn update_pasta(ptr: *anyopaque, allocator: std.mem.Allocator, entity: Pasta) anyerror!?Pasta {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn update_paste(ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         if (entity.id) |id| {
             var stmt = try self.db.prepareDynamic(UPDATE_SQL);
             defer stmt.deinit();
 
             try stmt.exec(.{}, entity);
-            return try get_pasta(ptr, allocator, id);
+            return try get_paste(ptr, allocator, id);
         }
         return entity;
     }
 
-    fn increase_read_count(ptr: *anyopaque, pasta: Pasta) !void {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn increase_read_count(ptr: *anyopaque, paste: Paste) !void {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
         var sql: ?[]u8 = null;
-        if (pasta.id) |id| {
+        if (paste.id) |id| {
             sql = try std.fmt.allocPrint(
                 temp_gpa, 
-                "UPDATE pasta SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE id = {}", 
+                "UPDATE paste SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE id = {}", 
                 .{
                     @as(u64, @intCast(std.time.timestamp())),
                     id
                 }
             );
-        } else if (pasta.name) |name| {
+        } else if (paste.name) |name| {
             sql = try std.fmt.allocPrint(
                 temp_gpa, 
-                "UPDATE pasta SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE name = '{s}'", 
+                "UPDATE paste SET latest_read_at = {}, read_count = COALESCE(read_count, 0) + 1 WHERE name = '{s}'", 
                 .{
                     @as(u64, @intCast(std.time.timestamp())),
                     name
@@ -317,8 +317,8 @@ pub const SqlitePastaDao = struct {
         }
     }
 
-    fn insert_pasta(ptr: *anyopaque, entity: Pasta) anyerror!?u64 {
-        const self: *SqlitePastaDao = @ptrCast(@alignCast(ptr));
+    fn insert_paste(ptr: *anyopaque, entity: Paste) anyerror!?u64 {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
         var stmt = try self.db.prepareDynamic(INSERT_SQL);
         defer stmt.deinit();
 
@@ -327,7 +327,7 @@ pub const SqlitePastaDao = struct {
 };
 
 
-test "[SqlitePastaDao] create table" {
+test "[SqlitePasteDao] create table" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -336,12 +336,12 @@ test "[SqlitePastaDao] create table" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
     try dao.create_table_if_not_exists();
 }
 
-test "[SqlitePastaDao] insert" {
+test "[SqlitePasteDao] insert" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -350,28 +350,28 @@ test "[SqlitePastaDao] insert" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = .{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = .{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     for (0..100) |i| {
-        var pasta: Pasta = Pasta {
+        var paste: Paste = Paste {
             .name = try std.fmt.allocPrint(allocator, "test-{}", .{i}),
             .private = i % 2 == 0,
             .expiration_at = 123456 * i
         };
-        if (dao.insert_pasta(pasta)) |id| {
-            pasta.id = id;
-            std.debug.print("insert test success: {}\n", .{pasta});
+        if (dao.insert_paste(paste)) |id| {
+            paste.id = id;
+            std.debug.print("insert test success: {}\n", .{paste});
         } else |err| {
             std.debug.print("insert test faield: {}\n", .{err});
         }
     }
 }
 
-test "[SqlitePastaDao] query by id" {
+test "[SqlitePasteDao] query by id" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -380,20 +380,20 @@ test "[SqlitePastaDao] query by id" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const pasta1 = try dao.get_pasta(allocator, 1);
-    std.debug.assert(pasta1 != null);
-    std.debug.print("pasta 1: {}\n", .{pasta1.?});
-    std.debug.assert(std.mem.eql(u8, pasta1.?.name.?, "test-0"));
+    const paste1 = try dao.get_paste(allocator, 1);
+    std.debug.assert(paste1 != null);
+    std.debug.print("paste 1: {}\n", .{paste1.?});
+    std.debug.assert(std.mem.eql(u8, paste1.?.name.?, "test-0"));
 }
 
-test "[SqlitePastaDao] query by name" {
+test "[SqlitePasteDao] query by name" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -402,20 +402,20 @@ test "[SqlitePastaDao] query by name" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const pasta1 = try dao.get_pasta_by_name(allocator, "test-1");
-    std.debug.assert(pasta1 != null);
-    std.debug.print("pasta test-1: {}\n", .{pasta1.?});
-    std.debug.assert(pasta1.?.id.? == 2);
+    const paste1 = try dao.get_paste_by_name(allocator, "test-1");
+    std.debug.assert(paste1 != null);
+    std.debug.print("paste test-1: {}\n", .{paste1.?});
+    std.debug.assert(paste1.?.id.? == 2);
 }
 
-test "[SqlitePastaDao] query all list" {
+test "[SqlitePasteDao] query all list" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -424,21 +424,21 @@ test "[SqlitePastaDao] query all list" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    if (dao.list_pastas(allocator, null)) |pasta| {
-        std.debug.print("query all list: {any}\n", .{pasta.?});
+    if (dao.list_pastes(allocator, null)) |paste| {
+        std.debug.print("query all list: {any}\n", .{paste.?});
     } else |e| {
         std.debug.print("query all list failed: {}\n", .{e});
     }
 }
 
-test "[SqlitePastaDao] query all private list" {
+test "[SqlitePasteDao] query all private list" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -447,23 +447,23 @@ test "[SqlitePastaDao] query all private list" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    if (dao.list_pastas(allocator, .{
+    if (dao.list_pastes(allocator, .{
         .private = true
-    })) |pasta| {
-        std.debug.print("query all private list: {any}\n", .{pasta.?});
+    })) |paste| {
+        std.debug.print("query all private list: {any}\n", .{paste.?});
     } else |e| {
         std.debug.print("query all private list failed: {}\n", .{e});
     }
 }
 
-test "[SqlitePastaDao] delete by id" {
+test "[SqlitePasteDao] delete by id" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -472,18 +472,18 @@ test "[SqlitePastaDao] delete by id" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    const flag1 = try dao.delete_pasta(10);
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    const flag1 = try dao.delete_paste(10);
     std.debug.print("delete id 10: {}\n", .{flag1});
-    const flag2 = try dao.delete_pasta(110);
+    const flag2 = try dao.delete_paste(110);
     std.debug.print("delete id 110: {}\n", .{flag2});
     // std.debug.assert(flag);
-    // std.debug.assert(try dao.delete_pasta(10));
-    // std.debug.assert(!try dao.delete_pasta(110));
+    // std.debug.assert(try dao.delete_paste(10));
+    // std.debug.assert(!try dao.delete_paste(110));
 }
 
-test "[SqlitePastaDao] delete by name" {
+test "[SqlitePasteDao] delete by name" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -492,15 +492,15 @@ test "[SqlitePastaDao] delete by name" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
-    const flag1 = try dao.delete_pasta_by_name("test-20");
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
+    const flag1 = try dao.delete_paste_by_name("test-20");
     std.debug.print("delete id test-20: {}\n", .{flag1});
-    const flag2 = try dao.delete_pasta_by_name("test-200");
+    const flag2 = try dao.delete_paste_by_name("test-200");
     std.debug.print("delete id test-200: {}\n", .{flag2});
 }
 
-test "[SqlitePastaDao] update" {
+test "[SqlitePasteDao] update" {
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
@@ -509,14 +509,14 @@ test "[SqlitePastaDao] update" {
         },
         .threading_mode = .MultiThread,
     });
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = &db };
-    var dao: PastaDao = sqldao.create();
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
+    var dao: PasteDao = sqldao.create();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    if (dao.update_pasta(allocator, .{
+    if (dao.update_paste(allocator, .{
         .id = 12,
         .latest_read_at = 548451654561,
         .name = "modified"
@@ -527,7 +527,7 @@ test "[SqlitePastaDao] update" {
     }
 }
 
-test "[SqlitePastaDao] test options" {
+test "[SqlitePasteDao] test options" {
     const Options = @import("common").Options;
     const DaoType = @import("common").DaoType;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -538,12 +538,12 @@ test "[SqlitePastaDao] test options" {
         .dao_type = DaoType.Sqlite
     });
 
-    var sqldao: SqlitePastaDao = SqlitePastaDao{ .db = options.sqlite_db.? };
-    var dao: PastaDao = sqldao.create();
-        if (dao.list_pastas(allocator, .{
+    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = options.sqlite_db.? };
+    var dao: PasteDao = sqldao.create();
+        if (dao.list_pastes(allocator, .{
         .private = false
-    })) |pasta| {
-        std.debug.print("query all public list: {any}\n", .{pasta.?});
+    })) |paste| {
+        std.debug.print("query all public list: {any}\n", .{paste.?});
     } else |e| {
         std.debug.print("query all public list failed: {}\n", .{e});
     }

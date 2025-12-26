@@ -1,7 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
-const PastaDao = @import("pasta").PastaDao;
-const SqlitePastaDao = @import("pasta").SqlitePastaDao;
+const PasteDao = @import("paste").PastaDao;
+const SqlitePasteDao = @import("paste").SqlitePastaDao;
 const sqlite = @import("sqlite");
 
 fn on_request(r: zap.Request) !void {
