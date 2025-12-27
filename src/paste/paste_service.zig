@@ -58,11 +58,11 @@ pub const PasteService = struct {
 
     /// read paste by name. will check password.  
     /// if password is correct, it's will increased paste read count and clean expired pastes. 
-    pub fn read_paste(self: *Self, gpa: Allocator, query: Paste) ?Paste {
+    pub fn read_paste(self: *Self, gpa: Allocator, query: Paste) !?Paste {
         if (query.name == null) {
             return null;
         }
-        const paste = self.find_paste(gpa, query.name.?);
+        const paste = try self.find_paste(gpa, query.name.?);
         if (paste) |p| {
             var success: bool = true;
             if (p.has_password != null and p.has_password.?) {
@@ -75,17 +75,15 @@ pub const PasteService = struct {
                     std.log.debug("[PasteService] failed increase read count: {}", .{e});
                 };
                 return p;
+            } else {
+                return error.PasswordRequired;
             }
         }
         return null;
     }
 
-    pub fn find_paste(self: *Self, gpa: Allocator, paste_name: []const u8) ?Paste {
-        const paste = self.dao.?.get_paste_by_name(gpa, paste_name) catch |err| {
-            std.debug.print("[PasteService] failed to find a paste by name {s}: {}", .{paste_name, err});
-            return null;
-        };
-        return paste;
+    pub fn find_paste(self: *Self, gpa: Allocator, paste_name: []const u8) !?Paste {
+        return try self.dao.?.get_paste_by_name(gpa, paste_name);
     }
 
     pub fn update_paste(self: *Self, gpa: Allocator, paste: Paste) !?Paste {
@@ -96,7 +94,7 @@ pub const PasteService = struct {
         if (entity.id == null) {
             var found: ?Paste = null;
             if (entity.name) |name| {
-                if (self.find_paste(temp_gpa, name)) |f| {
+                if (try self.find_paste(temp_gpa, name)) |f| {
                     found = f;
                 }
             }
@@ -306,7 +304,7 @@ var db = try sqlite.Db.init(.{
         try service.increase_read_count(.{
             .name = "test-66"
         });
-        const result = service.find_paste(gpa, "test-66");
+        const result = try service.find_paste(gpa, "test-66");
 
         std.debug.print("increase read count with name: {}\n", .{result.?});
     }
@@ -329,7 +327,7 @@ var db = try sqlite.Db.init(.{
     const gpa = arena.allocator();
 
     for (0..100) |_| {
-        const result = service.read_paste(gpa, .{
+        const result = try service.read_paste(gpa, .{
             .name = "test-56"
         });
         std.debug.print("read paste: {}\n", .{result.?});
