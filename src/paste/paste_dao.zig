@@ -9,6 +9,7 @@ pub const PasteDao = struct {
     get_paste_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Paste,
     get_paste_by_name_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste,
     list_pastes_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste,
+    page_summary_pastes_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste, page_no: ?u32, page_size: ?u32) anyerror!Paste.Page,
     delete_paste_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!bool,
     delete_paste_by_name_fn: *const fn (ptr: *anyopaque, name: []const u8) anyerror!bool,
     update_paste_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste,
@@ -58,6 +59,10 @@ pub const PasteDao = struct {
     pub fn clean_paste(self: PasteDao) !void {
         return try self.clean_paste_fn(self.ptr);
     }
+
+    pub fn page_summary_pastes(self: PasteDao, allocator: std.mem.Allocator, query: ?Paste, page_no: ?u32, page_size: ?u32) anyerror!Paste.Page {
+        return try self.page_summary_pastes_fn(self.ptr, allocator, query, page_no, page_size);
+    }
 };
 
 pub const SqlitePasteDao = struct {
@@ -100,8 +105,25 @@ pub const SqlitePasteDao = struct {
         \\  paste.expiration_at, 
         \\  paste.profiles 
         \\FROM paste
+        \\
     ;
-    const QUERY_SQL = SELECT_SQL ++
+    const SELECT_SUMMARY_SQL =
+        \\SELECT 
+        \\  paste.id, 
+        \\  paste.name, 
+        \\  paste.content_type, 
+        \\  paste.read_only, 
+        \\  paste.editable, 
+        \\  paste.has_password, 
+        \\  paste.read_count, 
+        \\  paste.latest_read_at, 
+        \\  paste.create_at, 
+        \\  paste.expiration_at
+        \\FROM paste
+        \\
+    ;
+    const SELECT_COUNT_SQL = "SELECT COUNT(id) FROM paste ";
+    const WHERE_SQL =
         \\ WHERE
         \\  (:id IS NULL OR id = :id) AND
         \\  (:name IS NULL OR name = :name) AND
@@ -120,6 +142,7 @@ pub const SqlitePasteDao = struct {
         \\  (:expiration_at IS NULL OR expiration_at = :expiration_at) AND
         \\  (:profiles IS NULL OR profiles = :profiles)
     ;
+    const QUERY_SQL = SELECT_SQL ++ WHERE_SQL;
     const INSERT_SQL =
         \\INSERT INTO paste (
         \\  name, 
@@ -184,6 +207,7 @@ pub const SqlitePasteDao = struct {
             .get_paste_fn = get_paste,
             .get_paste_by_name_fn = get_paste_by_name,
             .list_pastes_fn = list_pastes,
+            .page_summary_pastes_fn = page_summary_pastes,
             .delete_paste_fn = delete_paste,
             .delete_paste_by_name_fn = delete_paste_by_name,
             .update_paste_fn = update_paste,
@@ -248,6 +272,60 @@ pub const SqlitePasteDao = struct {
             .{},
             query orelse Paste {},
         );
+    }
+
+    fn page_summary_pastes(ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste, page_no: ?u32, page_size: ?u32) anyerror!Paste.Page {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+        const empty = comptime Paste.Page {
+            .list = &[_]Paste.Summary{},
+            .page_size = 0,
+            .page_no = 0,
+            .page_count = 0,
+            .total = 0,
+        };
+
+        const db = conn.get_db();
+        var total: ?u64 = undefined;
+        {
+            var stmt = try db.prepareDynamic(SELECT_COUNT_SQL ++ WHERE_SQL ++ " ORDER BY paste.create_at DESC");
+            defer stmt.deinit();
+            total = try stmt.one(
+                u64,
+                .{},
+                query orelse Paste {},
+            );
+        }
+        if (total) |count| {
+            if (count == 0) return empty;
+            const pg_size = @min(100, @max(1, page_size orelse 10));
+            const page_count: u32 = @intCast(count / pg_size + if (count % pg_size == 0) @as(u32, 0) else 1);
+            const pg_no = @min(page_count, @max(1, page_no orelse 1));
+            const offset = (pg_no - 1) * pg_size;
+            const sql = try std.fmt.allocPrint(
+                allocator,
+                SELECT_SUMMARY_SQL ++ WHERE_SQL ++ " ORDER BY paste.create_at DESC LIMIT {} OFFSET {}", 
+                .{ pg_size, offset }
+            );
+            defer allocator.free(sql);
+            var stmt = try db.prepareDynamic(sql);
+            defer stmt.deinit();
+            const result = try stmt.all(
+                Paste.Summary,
+                allocator,
+                .{},
+                query orelse Paste {},
+            );
+            return .{
+                .list = result,
+                .page_size = pg_size,
+                .page_no = pg_no,
+                .page_count = page_count,
+                .total = count,
+            };
+        }
+        return empty;
     }
 
     fn delete_paste(ptr: *anyopaque, id: u64) anyerror!bool {

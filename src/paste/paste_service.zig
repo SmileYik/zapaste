@@ -120,6 +120,12 @@ pub const PasteService = struct {
         });
         return result orelse &[_]Paste{};
     }
+
+    pub fn page_public_pastes_summary(self: *Self, allocator: Allocator, page_no: ?u32, page_size: ?u32) !Paste.Page {
+        return try self.dao.?.page_summary_pastes(
+            allocator, .{ .private = false }, page_no, page_size
+        );
+    }
 };
 
 fn split_static_file(comptime filename: []const u8) []const []const u8 {

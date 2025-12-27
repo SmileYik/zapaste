@@ -1,4 +1,5 @@
 const Allocator = @import("std").mem.Allocator;
+const PageList = @import("common").PageList;
 
 pub const Paste = struct {
     const Self = @This();
@@ -46,5 +47,21 @@ pub const Paste = struct {
             return try gpa.dupe(u8, s);
         }
         return null;
-    } 
+    }
+
+    pub const Page = PageList(Summary);
+    pub const Summary = struct {
+        /// id
+        id: ?u64 = null,
+        /// name
+        name: ?[]const u8 = null,
+        content_type: ?[]const u8 = null,
+        read_only: ?bool = null,
+        editable: ?bool = null,
+        has_password: ?bool = null,
+        read_count: ?u64 = null,
+        latest_read_at: ?u64 = null,
+        create_at: ?u64 = null,
+        expiration_at: ?u64 = null,
+    };
 };
