@@ -16,46 +16,46 @@ pub const PasteDao = struct {
     clean_paste_fn: *const fn (ptr: *anyopaque) anyerror!void,
 
     pub fn create_table_if_not_exists(self: PasteDao) anyerror!void {
-        return self.create_table_if_not_exists_fn(self.ptr);
+        return try self.create_table_if_not_exists_fn(self.ptr);
     }
 
     pub fn get_paste(self: PasteDao, allocator: std.mem.Allocator, id: u64) anyerror!?Paste {
-        return self.get_paste_fn(self.ptr, allocator, id);
+        return try self.get_paste_fn(self.ptr, allocator, id);
     }
 
     pub fn get_paste_by_name(self: PasteDao, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste {
-        return self.get_paste_by_name_fn(self.ptr, allocator, name);
+        return try self.get_paste_by_name_fn(self.ptr, allocator, name);
     }
 
     pub fn list_pastes(self: PasteDao, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste {
-        return self.list_pastes_fn(self.ptr, allocator, query);
+        return try self.list_pastes_fn(self.ptr, allocator, query);
     }
 
     pub fn delete_paste(self: PasteDao, id: u64) anyerror!bool {
-        return self.delete_paste_fn(self.ptr, id);
+        return try self.delete_paste_fn(self.ptr, id);
     }
 
     pub fn delete_paste_by_name(self: PasteDao, name: []const u8) anyerror!bool {
-        return self.delete_paste_by_name_fn(self.ptr, name);
+        return try self.delete_paste_by_name_fn(self.ptr, name);
     }
 
     pub fn update_paste(self: PasteDao, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
-        return self.update_paste_fn(self.ptr, allocator, entity);
+        return try self.update_paste_fn(self.ptr, allocator, entity);
     }
 
     /// increase read count. allow pass name or id. id has higer priority.
     pub fn increase_read_count(self: PasteDao, paste: Paste) !void {
-        return self.increase_read_count_fn(self.ptr, paste);
+        return try self.increase_read_count_fn(self.ptr, paste);
     }
 
     /// insert Paste into table and return the id in the table.
     pub fn insert_paste(self: PasteDao, entity: Paste) anyerror!?u64 {
-        return self.insert_paste_fn(self.ptr, entity);
+        return try self.insert_paste_fn(self.ptr, entity);
     }
 
     /// clean paste includes burn_after_reads and expirations.
     pub fn clean_paste(self: PasteDao) !void {
-        return self.clean_paste_fn(self.ptr);
+        return try self.clean_paste_fn(self.ptr);
     }
 };
 
