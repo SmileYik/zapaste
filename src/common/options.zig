@@ -37,8 +37,7 @@ pub const Options = struct {
                     },
                     .threading_mode = .MultiThread,
                 }, 
-                8,
-                10000
+                8
             );
         }
         return options;

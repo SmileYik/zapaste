@@ -25,29 +25,30 @@ pub const SqlitePoolError = error {
 
 dbs: []sqlite.Db,
 occupancy: AtomicValue(u32),
+latest_idx: AtomicValue(u32) = AtomicValue(u32).init(0),
 capacity: u32,
-max_retry: ?u32 = 10000,
+mutex: std.Thread.Mutex = .{},
+cond: std.Thread.Condition = .{},
 
 /// init a Sqlite pool
 /// 
 /// ## params
 /// + `options`: Sqlite options,
 /// + `capacity`: pool capacity
-/// + `max_retry`: max retry counts while database connections all busy. default is 10000
-pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, max_retry: ?u32) !*Self {
+pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32) !*Self {
     const self = try allocator.create(Self);
     const dbs = try allocator.alloc(sqlite.Db, capacity);
 
     for (0..capacity) |idx| {
         dbs[idx] = try sqlite.Db.init(options);
         _ = try dbs[idx].pragma(void, .{}, "journal_mode", "WAL");
+        _ = try dbs[idx].pragma(void, .{}, "busy_timeout", "1000");
     }
 
     self.* = .{
         .dbs = dbs,
         .capacity = capacity,
         .occupancy = AtomicValue(u32).init(0),
-        .max_retry = max_retry
     };
     return self;
 }
@@ -63,6 +64,7 @@ pub fn deinit(self: *Self) void {
 pub fn get_connection(self: *Self) SqlitePoolError!Connection {
     const index = self.acquire_index();
     if (index) |idx| {
+        std.debug.print("[SimpleSqlitePool] acquired pool: {}\n", .{idx});
         return .{
             .pool = self,
             .index = idx
@@ -71,34 +73,50 @@ pub fn get_connection(self: *Self) SqlitePoolError!Connection {
     return SqlitePoolError.Busy;
 }
 
-fn acquire_index(self: *Self) ?usize {
-    var retry_count_down: u32 = self.max_retry orelse 10000;
-    while (retry_count_down != 0) {
-        retry_count_down -= 1;
-        const current: u32 = self.occupancy.load(.monotonic);
-        const first_free_idx = @ctz(~current);
-        if (first_free_idx >= self.capacity) {
-            std.Thread.yield() catch {}; 
-            continue;
+fn try_acquire_index(self: *Self) ?usize {
+    const full_mask = (@as(u32, 1) << @intCast(self.capacity)) - 1;
+    const current: u32 = self.occupancy.load(.acquire);
+    if (current >= full_mask) return null;
+
+    const start = self.latest_idx.load(.acquire);
+    var i: u32 = 0;
+    while (i < self.capacity) : (i += 1) {
+        const candidate = (start + i) % self.capacity;
+        const mask = @as(u32, 1) << @intCast(candidate);
+        if (current & mask == 0) {
+            _ = self.occupancy.cmpxchgStrong(
+                current, 
+                current | mask, 
+                .acquire, 
+                .monotonic
+            ) orelse {
+                self.latest_idx.store((candidate + 1) % self.capacity, .monotonic);
+                return candidate;
+            };
+            break;
         }
-
-        const mask = @as(u32, 1) << @intCast(first_free_idx);
-        const next = current | mask;
-
-        const result = self.occupancy.cmpxchgWeak(
-            current, 
-            next, 
-            .acquire, 
-            .monotonic
-        );
-        if (result) |_| continue;
-
-        return first_free_idx;
     }
     return null;
+}
+
+fn acquire_index(self: *Self) ?usize {
+    if (self.try_acquire_index()) |idx| return idx;
+    const full_mask = (@as(u32, 1) << @intCast(self.capacity)) - 1;
+    self.mutex.lock();
+    defer self.mutex.unlock();
+    while (true) {
+        const current = self.occupancy.load(.acquire);
+        
+        if (current < full_mask) {
+            if (self.try_acquire_index()) |idx| return idx;
+        }
+
+        self.cond.wait(&self.mutex);
+    }
 }
 
 fn release_index(self: *Self, index: usize) void {
     const mask = @as(u32, 1) << @intCast(index);
     _ = self.occupancy.fetchAnd(~mask, .release);
+    self.cond.signal();
 }
