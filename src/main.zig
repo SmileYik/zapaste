@@ -4,46 +4,36 @@ const Paste = @import("paste").Paste;
 const PasteDao = @import("paste").PasteDao;
 const SqlitePasteDao = @import("paste").SqlitePasteDao;
 const sqlite = @import("sqlite");
-const VariableRouter = @import("variable_router.zig").VariableRouter;
+const WrapperRouter = @import("zapaste").WrapperRouter;
 const Router = zap.Router;
+const Options = @import("zapaste").common.Options;
+const DaoType = @import("zapaste").common.DaoType;
+const Result = @import("zapaste").common.Result;
+const PasteController = @import("zapaste").PasteController;
 
-fn on_request(r: zap.Request) !void {
-    if (r.path) |the_path| {
-        std.debug.print("PATH: {s}\n", .{the_path});
-    }
-
-    if (r.query) |the_query| {
-        std.debug.print("QUERY: {s}\n", .{the_query});
-    }
-
-    r.sendBody("<html><body><h1>Hello from ZAP!!!</h1></body></html>") catch return;
+fn on_not_found(r: zap.Request) !void {
+    return Result.create(u8).init(404, null, null).send_json(r, .{ .emit_null_optional_fields = false });
 }
-
-fn on_request_1(path_variables: std.StringHashMap([]const u8), r: zap.Request) !void {
-    r.sendBody(path_variables.get("id").?) catch return;
-}
-
-fn on_request_2(ptr: *const anyopaque, path_variables: std.StringHashMap([]const u8), r: zap.Request) !void {
-    const paste: *const Paste = @ptrCast(@alignCast(ptr));
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const gpa = arena.allocator();
-    const result = try std.fmt.allocPrint(gpa, "{s}-{s}", .{ path_variables.get("id").?, paste.name.? });
-    r.sendBody(result) catch return;
-}
-
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const gpa = arena.allocator();
-    var router: *VariableRouter = try VariableRouter.init(gpa, .{});
-    try router.handle_var_func_unbound(gpa, "/user/:id", &on_request_1);
-    const a: Paste = .{
-        .name = "abc"
+    const allocator = arena.allocator();
+
+    const options = Options.init(allocator, .{
+        .dao_type = DaoType.Sqlite,
+        .work_dir = "./"
+    }) catch |e| {
+        std.debug.print("test options failed, cannot init options: {}", .{e});
+        return;
     };
-    try router.handle_var_func_bound(gpa, "/user/name/:id", &a, &on_request_2);
-    try router.handle_func_unbound("/index", on_request);
+
+    var router: *WrapperRouter = try WrapperRouter.init(allocator, .{
+        .not_found = on_not_found
+    });
+
+    const paste_controller = try PasteController.init(allocator, options);
+    try paste_controller.register(allocator, router);
 
     var listener = zap.HttpListener.init(.{
         .port = 3000,
@@ -56,7 +46,7 @@ pub fn main() !void {
     std.debug.print("Listening on 0.0.0.0:3000\n", .{});
 
     zap.start(.{
-        .threads = 2,
+        .threads = 10,
         .workers = 1, // 1 worker enables sharing state between threads
     });
 }
