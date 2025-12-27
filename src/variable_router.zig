@@ -2,12 +2,12 @@ const std = @import("std");
 const zap = @import("zap");
 const Router = zap.Router;
 
+pub const RouterOptions = struct {
+    not_found: ?zap.HttpRequestFn = null
+};
+
 /// This router similiar with zap.Router
 pub const VariableRouter = struct {
-
-    pub const Options = struct {
-        not_found: ?zap.HttpRequestFn = null
-    };
 
     const VariablePath = struct {
         paths: []const []const u8,
@@ -120,7 +120,7 @@ pub const VariableRouter = struct {
 
     var _instance: *VariableRouter = undefined;
     
-    pub fn init(allocator: std.mem.Allocator, options: Options) !*VariableRouter {
+    pub fn init(allocator: std.mem.Allocator, options: RouterOptions) !*VariableRouter {
         var router = try allocator.create(VariableRouter);
         router.* = .{
             .routes = try std.ArrayList(Record).initCapacity(allocator, 16),
@@ -242,6 +242,63 @@ pub const VariableRouter = struct {
                 },
             }
             path_variables.?.deinit();
+        } else if (self.not_found) |handler| {
+            try handler(r);
+        } else {
+            r.setStatus(.not_found);
+        }
+    }
+};
+
+pub const WrapperRouter = struct {
+    const RouterMap = std.AutoHashMap(zap.http.Method, *VariableRouter);
+    var _instance: *WrapperRouter = undefined;
+
+    router_map: RouterMap,
+    not_found: ?zap.HttpRequestFn = null,
+
+    pub fn init(allocator: std.mem.Allocator, options: RouterOptions) !*WrapperRouter {
+        const r = try allocator.create(WrapperRouter);
+        r.* = .{
+            .router_map = RouterMap.init(allocator),
+            .not_found = options.not_found orelse null,
+        };
+        return r;
+    }
+
+    pub fn deinit(self: *WrapperRouter) void {
+        const iter = self.router_map.valueIterator();
+        while (iter.next()) |r| {
+            r.*.deinit();
+        }
+        self.router_map.deinit();
+    }
+
+    pub fn special(self: *WrapperRouter, allocator: std.mem.Allocator, method: zap.http.Method) !*VariableRouter {
+        if (self.router_map.contains(method)) {
+            return self.router_map.get(method).?;
+        } else {
+            const r = try VariableRouter.init(allocator, .{
+                .not_found = self.not_found
+            });
+            try self.router_map.put(method, r);
+            return r;
+        }
+    }
+
+    pub fn on_request_handler(self: *WrapperRouter) zap.HttpRequestFn {
+        _instance = self;
+        return zap_on_request;
+    }
+
+    fn zap_on_request(r: zap.Request) !void {
+        return serve(_instance, r);
+    }
+
+    fn serve(self: *WrapperRouter, r: zap.Request) !void {
+        const method = r.methodAsEnum();
+        if (self.router_map.get(method)) |dispatch| {
+            try dispatch.on_request_handler()(r);
         } else if (self.not_found) |handler| {
             try handler(r);
         } else {
