@@ -5,6 +5,7 @@ const PasteDao = @import("paste").PasteDao;
 const SqlitePasteDao = @import("paste").SqlitePasteDao;
 const sqlite = @import("sqlite");
 const VariableRouter = @import("variable_router.zig").VariableRouter;
+const Router = zap.Router;
 
 fn on_request(r: zap.Request) !void {
     if (r.path) |the_path| {
@@ -36,12 +37,13 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const gpa = arena.allocator();
-    var router: VariableRouter = try VariableRouter.init(gpa, .{});
-    try router.handle_func_unbound(gpa, "/user/:id", &on_request_1);
+    var router: *VariableRouter = try VariableRouter.init(gpa, .{});
+    try router.handle_var_func_unbound(gpa, "/user/:id", &on_request_1);
     const a: Paste = .{
         .name = "abc"
     };
-    try router.handle_func_bound(gpa, "/user/name/:id", &a, &on_request_2);
+    try router.handle_var_func_bound(gpa, "/user/name/:id", &a, &on_request_2);
+    try router.handle_func_unbound("/index", on_request);
 
     var listener = zap.HttpListener.init(.{
         .port = 3000,

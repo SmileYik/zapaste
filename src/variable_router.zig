@@ -2,7 +2,7 @@ const std = @import("std");
 const zap = @import("zap");
 const Router = zap.Router;
 
-/// This router similiar with zap.Router, but only allow variable path.
+/// This router similiar with zap.Router
 pub const VariableRouter = struct {
 
     pub const Options = struct {
@@ -115,18 +115,44 @@ pub const VariableRouter = struct {
     };
 
     routes: std.ArrayList(Record),
-    not_found: ?zap.HttpRequestFn,
+    not_found: ?zap.HttpRequestFn = null,
+    inner_router: Router,
 
     var _instance: *VariableRouter = undefined;
-
-    pub fn init(allocator: std.mem.Allocator, options: Options) !VariableRouter {
-        return .{
+    
+    pub fn init(allocator: std.mem.Allocator, options: Options) !*VariableRouter {
+        var router = try allocator.create(VariableRouter);
+        router.* = .{
             .routes = try std.ArrayList(Record).initCapacity(allocator, 16),
-            .not_found = options.not_found,
+            .not_found = options.not_found orelse null,
+            .inner_router = undefined
         };
+        router.inner_router = Router.init(allocator, .{
+            .not_found = router.on_inner_router_not_fount()
+        });
+        return router;
     }
 
-    pub fn handle_func_unbound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, h: anytype) !void {
+    /// handle function unbound with none variable path, as same as zap.Router
+    pub fn handle_func_unbound(self: *VariableRouter, comptime path: []const u8, h: anytype) !void {
+        try self.inner_router.handle_func_unbound(path, h);
+    }
+
+    /// handle function bound with none variable path, as same as zap.Router
+    pub fn handle_func_bound(self: *VariableRouter, comptime path: []const u8, instance: *const anyopaque, h: anytype) !void {
+        try self.inner_router.handle_func_bound(path, instance, h);
+    }
+
+    /// handle function unbound with includes variable path.  
+    /// the passed `path` must includes path variable, a path variable starts with `:`, `:name` means `name` variable. there are some examples:
+    /// 
+    /// + `/user/:firstname/:lastname/files`: this path includes two variables `firstname` and `lastname`, 
+    /// it's will matches paths like `/user/tom/green/files`, `/user/jecky/zhang/files`
+    /// + `/user/:id`: this path includes `id` variable.
+    /// it's will matches paths like `/user/1`, `/user/2`
+    /// 
+    /// and `h` is your handler, it's must be `*fn (path_variables: std.StringHashMap([]const u8), zap.Request) anyerror!void`
+    pub fn handle_var_func_unbound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, h: anytype) !void {
         if (path.len == 0) {
             return;
         }
@@ -139,7 +165,16 @@ pub const VariableRouter = struct {
         });
     }
 
-    pub fn handle_func_bound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, instance: *const anyopaque, h: anytype) !void {
+    /// handle function unbound with includes variable path.  
+    /// the passed `path` must includes path variable, a path variable starts with `:`, `:name` means `name` variable. there are some examples:
+    /// 
+    /// + `/user/:firstname/:lastname/files`: this path includes two variables `firstname` and `lastname`, 
+    /// it's will matches paths like `/user/tom/green/files`, `/user/jecky/zhang/files`
+    /// + `/user/:id`: this path includes `id` variable.
+    /// it's will matches paths like `/user/1`, `/user/2`
+    /// 
+    /// and `h` is your handler, it's must be `*fn (*const anyopaque, path_variables: std.StringHashMap([]const u8), zap.Request) anyerror!void`
+    pub fn handle_var_func_bound(self: *VariableRouter, allocator: std.mem.Allocator, comptime path: []const u8, instance: *const anyopaque, h: anytype) !void {
         if (path.len == 0) {
             return;
         }
@@ -155,11 +190,16 @@ pub const VariableRouter = struct {
         });
     }
 
-    pub fn deinit(self: *Router) void {
+    pub fn deinit(self: *VariableRouter) void {
         self.routes.deinit();
+        self.inner_router.deinit();
     }
 
     pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
+        return self.inner_router.on_request_handler();
+    }
+
+    fn on_inner_router_not_fount(self: *VariableRouter) zap.HttpRequestFn {
         _instance = self;
         return zap_on_request;
     }
