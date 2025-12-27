@@ -113,6 +113,13 @@ pub const PasteService = struct {
     pub fn increase_read_count(self: *Self, paste: Paste) !void {
         try self.dao.?.increase_read_count(paste);
     }
+
+    pub fn list_public_pastes(self: *Self, allocator: Allocator) anyerror![]Paste {
+        const result = try self.dao.?.list_pastes(allocator, .{
+            .private = false
+        });
+        return result orelse &[_]Paste{};
+    }
 };
 
 fn split_static_file(comptime filename: []const u8) []const []const u8 {
