@@ -196,6 +196,7 @@ pub const VariableRouter = struct {
     }
 
     pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
+        self.inner_router.not_found = self.on_inner_router_not_fount();
         return self.inner_router.on_request_handler();
     }
 
