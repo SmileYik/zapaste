@@ -3,6 +3,9 @@ const zap = @import("zap");
 
 const Allocator = std.mem.Allocator;
 
+const U8Result = create(u8);
+const UnknownError = U8Result.init(500, null, "Unknown Error");
+
 pub fn create(comptime T: type) type {
     return struct {
         pub const Self = @This();
@@ -40,17 +43,32 @@ pub fn create(comptime T: type) type {
             };
         }
 
-        pub inline fn send_json(self: Self, req: zap.Request, options: std.json.Stringify.Options) void {
-            var buf: [256]u8 = undefined;
-            var json_to_send: []const u8 = undefined;
-            json_to_send = zap.util.stringifyBuf(&buf, self, options) catch |e| {
-                std.log.err("JSON failed: {s}\n", .{@errorName(e)});
+        fn create_error_json(allocator: Allocator, err: anyerror) U8Result {
+            const msg = std.fmt.allocPrint(
+                allocator, 
+                "create array list failed: {s}\n", 
+                .{@errorName(err)}
+            ) catch |e| {
+                std.log.err("failed to create result: {s}\n", .{@errorName(e)});
+                return UnknownError;
+            };
+            return U8Result.init(500, null, msg);
+        }
+
+        pub fn send_json(self: Self, req: zap.Request, options: std.json.Stringify.Options) void {
+            var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+            defer arena.deinit();
+            const allocator = arena.allocator();
+
+            const formatter = std.json.fmt(self, options);
+            const json_to_send = std.fmt.allocPrint(allocator, "{f}", .{formatter}) catch |e| {
+                std.log.err("struct stringify failed: {s}\n", .{@errorName(e)});
+                create_error_json(allocator, e).send_json(req, options);
                 return;
             };
             
             std.debug.print("<< json: {s}\n", .{json_to_send});
-            req.setContentType(.JSON) catch return;
-            req.sendBody(json_to_send) catch return;
+            req.sendJson(json_to_send) catch return;
         }
     };
 }
