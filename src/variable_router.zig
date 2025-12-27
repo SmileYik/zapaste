@@ -249,3 +249,13 @@ pub const VariableRouter = struct {
         }
     }
 };
+
+test "[VariablePath] test1" {
+    const VariablePath = VariableRouter.VariablePath;
+    std.debug.print("Start [VariablePath] test1 \n", .{});
+    const vp = VariablePath.init("/user/:username/info");
+    std.debug.assert(vp.matches("/user/zhangsan/info"));
+    std.debug.assert(vp.matches("/user/张三/info"));
+    std.debug.assert(vp.matches("/user/z/info"));
+    std.debug.assert(!vp.matches("/user/z/info/abc"));
+}
