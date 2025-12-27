@@ -139,8 +139,8 @@ pub const VariableRouter = struct {
     }
 
     /// handle function bound with none variable path, as same as zap.Router
-    pub fn handle_func_bound(self: *VariableRouter, comptime path: []const u8, instance: *const anyopaque, h: anytype) !void {
-        try self.inner_router.handle_func_bound(path, instance, h);
+    pub fn handle_func_bound(self: *VariableRouter, comptime path: []const u8, instance: *anyopaque, h: anytype) !void {
+        try self.inner_router.handle_func(path, instance, h);
     }
 
     /// handle function unbound with includes variable path.  
