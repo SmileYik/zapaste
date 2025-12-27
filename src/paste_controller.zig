@@ -1,0 +1,224 @@
+const std = @import("std");
+const zap = @import("zap");
+const common = @import("common");
+const paste = @import("paste");
+const WrapperRouter = @import("variable_router.zig").WrapperRouter;
+
+const Allocator = std.mem.Allocator;
+
+pub const Self = @This();
+
+service: ?paste.PasteService = undefined,
+
+pub fn init(allocator: Allocator, options: common.Options) !*Self {
+    var self: *Self = try allocator.create(Self);
+    self.* = .{
+        .service = undefined,
+    };
+    switch (options.dao_type) {
+        .Sqlite => |_| {
+            var sqldao: *paste.SqlitePasteDao = try allocator.create(paste.SqlitePasteDao);
+            sqldao.* = .{ .pool = options.sqlite.? };
+            const dao = try allocator.create(paste.PasteDao);
+            dao.* = sqldao.create();
+            try dao.create_table_if_not_exists();
+            self.service = paste.PasteService.create(.{
+                .dao = dao
+            });
+        },
+    }
+    return self;
+}
+
+pub fn register(self: *Self, allocator: Allocator, router: *WrapperRouter) !void {
+    const get_router = try router.special(allocator, .GET);
+    try get_router.handle_func_bound("/paste", self, &list_public_pastes);
+    try get_router.handle_var_func_bound(allocator, "/paste/:name", self, &get_unlocked_paste);
+
+    const post_router = try router.special(allocator, .POST);
+    try post_router.handle_func_bound("/paste", self, &create_paste);
+    try post_router.handle_var_func_bound(allocator, "/paste/:name", self, &get_locked_paste);
+}
+
+const PastePageResult = common.Result.create(paste.Paste.Page);
+
+const PasteResult = common.Result.create(paste.Paste);
+
+const PasswordModel = struct {
+    password: ?[]const u8 = null
+};
+
+const result_name_cannot_empty = PasteResult.init(500, null, "Paste name cannot be empty.");
+const result_no_password = PasteResult.init(500, null, "Please verify your password.");
+const strip_null_field = std.json.Stringify.Options { .emit_null_optional_fields = false };
+
+fn parse_number(str: ?[]const u8, T: type, default_value: T) T {
+    if (str) |s| {
+        return std.fmt.parseInt(T, s, 10) catch default_value;
+    } else {
+        return default_value;
+    }
+}
+
+/// get the paste with password, need pass `password` field
+/// 
+/// POST /paste/:name
+/// 
+/// content-type: application/json
+/// 
+/// body: `PasswordModel`
+fn get_locked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    if (req.body == null) {
+        result_no_password.send_json(req, strip_null_field);
+        return;
+    }
+    const name = path_variables.get("name").?;
+    if (std.mem.trim(u8, name, " \t\r\n").len == 0) {
+        result_name_cannot_empty.send_json(req, strip_null_field);
+        return;
+    }
+
+    const parsed = try std.json.parseFromSlice(
+        PasswordModel, 
+        allocator, 
+        req.body.?, 
+        .{ .ignore_unknown_fields = true }
+    );
+    defer parsed.deinit();
+    const password_model: PasswordModel = parsed.value;
+    if (
+        password_model.password == null or 
+        std.mem.trim(u8, password_model.password.?, " \r\t\n").len == 0
+    ) {
+        result_no_password.send_json(req, strip_null_field);
+        return;
+    }
+
+    const paste_opt = self.service.?.read_paste(
+        allocator, .{ .name = name, .password = password_model.password }
+    ) catch |e| {
+        const result = try PastePageResult.failed(allocator, e, "failed to read this paste!");
+        result.send_json(req, strip_null_field);
+        return;
+    };
+    const result = 
+        if (paste_opt) |p| blk: {
+            var new = try p.dupe(allocator);
+            new.password = null;
+            break :blk PasteResult.success(new, null);
+        } else PasteResult.init(500, null, "Not exists");
+    result.send_json(req, strip_null_field);
+}
+
+/// get none password paste by name
+/// 
+/// GET /paste/:name
+/// 
+fn get_unlocked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    const name = path_variables.get("name").?;
+    if (std.mem.trim(u8, name, " \t\r\n").len == 0) {
+        result_name_cannot_empty.send_json(req, strip_null_field);
+        return;
+    }
+    const paste_opt = self.service.?.read_paste(
+        allocator, .{ .name = name }
+    ) catch |e| {
+        const result = try PastePageResult.failed(allocator, e, "failed to read this paste!");
+        result.send_json(req, strip_null_field);
+        return;
+    };
+    const result = 
+        if (paste_opt) |p| blk: {
+            var new = try p.dupe(allocator);
+            new.password = null;
+            break :blk PasteResult.success(new, null);
+        } else PasteResult.init(500, null, "Not exists");
+    result.send_json(req, .{.emit_null_optional_fields = false});
+}
+
+/// list public pastes, includes pagination
+/// 
+/// GET /paste
+/// 
+/// params: 
+/// + `page_size`: optional, default 10, means how many paste items should be returned.
+/// + `page_no`: optional, default 1, means the page number
+fn list_public_pastes(self: *Self, req: zap.Request) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    const page_size = parse_number(req.getParamSlice("page_size"), u32, 10);
+    const page_no = parse_number(req.getParamSlice("page_no"), u32, 1);
+    
+    var result: ?PastePageResult = null;
+    if (self.service.?.page_public_pastes_summary(allocator, page_no, page_size)) |page| {
+        result = PastePageResult.success(page, null);
+    } else |err| {
+        result = try PastePageResult.failed(allocator, err, "show paste list failed!" );
+    }
+
+    result.?.send_json(req, strip_null_field);
+}
+
+/// create paste, you can special any field but `id`.
+/// 
+/// POST /paste
+/// 
+/// content-type: application/form-date
+/// 
+/// params: `paste={JSON}`, `{JSON}` is `Paste` type. 
+/// 
+fn create_paste(self: *Self, req: zap.Request) !void {
+    const no_valid_payload = comptime PasteResult.init(500, null, "No valid payload");
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    if (req.body == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+    try req.parseBody();
+    const body = try req.parametersToOwnedList(allocator);
+    var paste_json: ?[] const u8 = null;
+    for (body.items) |item| {
+        if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
+            switch (item.value.?) {
+                .String => |s| paste_json = s,
+                else => continue
+            }
+            break;
+        }
+    }
+
+    if (paste_json == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+    const parsed = try std.json.parseFromSlice(paste.Paste, allocator, paste_json.?, .{
+        .ignore_unknown_fields = true,
+        .allocate = .alloc_always,
+    });
+    defer parsed.deinit();
+    const result = if (self.service.?.create_paste(allocator, parsed.value)) |inserted| blk: {
+        break :blk PasteResult.success(inserted, "success");
+    } else |e| blk: {
+        break :blk try PasteResult.failed(allocator, e, "failed to create");
+    };
+
+    result.send_json(req, strip_null_field);
+}
