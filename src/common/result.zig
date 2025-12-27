@@ -3,8 +3,8 @@ const zap = @import("zap");
 
 const Allocator = std.mem.Allocator;
 
-const U8Result = create(u8);
-const UnknownError = U8Result.init(500, null, "Unknown Error");
+pub const U8Result = create(u8);
+pub const UnknownError = U8Result.init(500, null, "Unknown Error");
 
 pub fn create(comptime T: type) type {
     return struct {
