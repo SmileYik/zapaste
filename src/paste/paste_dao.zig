@@ -1,6 +1,7 @@
 const std = @import("std");
 const Paste = @import("paste.zig").Paste;
 const sqlite = @import("sqlite");
+const SimpleSqlitePool = @import("common").SimpleSqlitePool;
 
 pub const PasteDao = struct {
     ptr: *anyopaque,
@@ -174,7 +175,7 @@ pub const SqlitePasteDao = struct {
         \\WHERE id = :id
     ;
 
-    db: *sqlite.Db,
+    pool: *SimpleSqlitePool,
 
     pub fn create(self: *SqlitePasteDao) PasteDao {
         return .{
@@ -194,14 +195,19 @@ pub const SqlitePasteDao = struct {
 
     fn create_table_if_not_exists(ptr: *anyopaque) anyerror!void {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
-        try self.db.exec(CREATE_TABLE_SQL, .{}, .{});
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
+        try conn.get_db().exec(CREATE_TABLE_SQL, .{}, .{});
     }
 
     fn get_paste(ptr: *anyopaque, allocator: std.mem.Allocator, id: u64) anyerror!?Paste {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
 
         const query = SELECT_SQL ++ " WHERE paste.id = ?";
-        var stmt = try self.db.prepare(query);
+        var stmt = try conn.get_db().prepare(query);
         defer stmt.deinit();
         const row = try stmt.oneAlloc(
             Paste,
@@ -214,9 +220,11 @@ pub const SqlitePasteDao = struct {
 
     fn get_paste_by_name(ptr: *anyopaque, allocator: std.mem.Allocator, name: []const u8) anyerror!?Paste {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
 
         const query = SELECT_SQL ++ " WHERE paste.name = ?";
-        var stmt = try self.db.prepare(query);
+        var stmt = try conn.get_db().prepare(query);
         defer stmt.deinit();
         const row = try stmt.oneAlloc(
             Paste,
@@ -229,7 +237,10 @@ pub const SqlitePasteDao = struct {
 
     fn list_pastes(ptr: *anyopaque, allocator: std.mem.Allocator, query: ?Paste) anyerror!?[]Paste {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
-        var stmt = try self.db.prepareDynamic(QUERY_SQL);
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
+        var stmt = try conn.get_db().prepareDynamic(QUERY_SQL);
         defer stmt.deinit();
         return try stmt.all(
             Paste,
@@ -241,8 +252,11 @@ pub const SqlitePasteDao = struct {
 
     fn delete_paste(ptr: *anyopaque, id: u64) anyerror!bool {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
         const sql = "DELETE FROM paste WHERE paste.id = ?";
-        var stmt = try self.db.prepare(sql);
+        var stmt = try conn.get_db().prepare(sql);
         defer stmt.deinit();
         try stmt.exec(.{}, .{id});
         return true;
@@ -250,8 +264,11 @@ pub const SqlitePasteDao = struct {
 
     fn delete_paste_by_name(ptr: *anyopaque, name: []const u8) anyerror!bool {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
         const sql = "DELETE FROM paste WHERE paste.name = ?";
-        var stmt = try self.db.prepare(sql);
+        var stmt = try conn.get_db().prepare(sql);
         defer stmt.deinit();
         try stmt.exec(.{}, .{name});
         return true;
@@ -259,21 +276,27 @@ pub const SqlitePasteDao = struct {
 
     fn clean_paste(ptr: *anyopaque) !void {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
         const sql =
             \\DELETE FROM paste WHERE
             \\(burn_after_reads IS NOT NULL AND read_count > burn_after_reads)
             \\OR
             \\(expiration_at IS NOT NULL AND expiration_at > ?)
         ;
-        var stmt = try self.db.prepare(sql);
+        var stmt = try conn.get_db().prepare(sql);
         defer stmt.deinit();
         try stmt.exec(.{}, .{ @as(u64, @intCast(std.time.timestamp())) });
     }
 
     fn update_paste(ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
         if (entity.id) |id| {
-            var stmt = try self.db.prepareDynamic(UPDATE_SQL);
+            var stmt = try conn.get_db().prepareDynamic(UPDATE_SQL);
             defer stmt.deinit();
 
             try stmt.exec(.{}, entity);
@@ -284,6 +307,9 @@ pub const SqlitePasteDao = struct {
 
     fn increase_read_count(ptr: *anyopaque, paste: Paste) !void {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
@@ -311,7 +337,7 @@ pub const SqlitePasteDao = struct {
             sql = null;
         }
         if (sql) |s| {
-            var stmt = try self.db.prepareDynamic(s);
+            var stmt = try conn.get_db().prepareDynamic(s);
             defer stmt.deinit();
             try stmt.exec(.{}, .{});
         }
@@ -319,43 +345,45 @@ pub const SqlitePasteDao = struct {
 
     fn insert_paste(ptr: *anyopaque, entity: Paste) anyerror!?u64 {
         const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
-        var stmt = try self.db.prepareDynamic(INSERT_SQL);
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
+        var stmt = try conn.get_db().prepareDynamic(INSERT_SQL);
         defer stmt.deinit();
 
         return try stmt.one(u64, .{}, entity);
     }
 };
 
-
-test "[SqlitePasteDao] create table" {
-    var db = try sqlite.Db.init(.{
+fn get_dao(allocator: std.mem.Allocator) !PasteDao {
+    var pool = SimpleSqlitePool.init(allocator, .{
         .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
         .open_flags = .{
             .write = true,
             .create = true,
         },
         .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
+    }, 1);
+    var sqldao: *SqlitePasteDao = try allocator.create(SqlitePasteDao);
+    sqldao.* = .{ .pool = &pool };
+    return sqldao.create();
+}
+
+test "[SqlitePasteDao] create table" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
+
     try dao.create_table_if_not_exists();
 }
 
 test "[SqlitePasteDao] insert" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = .{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
+
     for (0..100) |i| {
         var paste: Paste = Paste {
             .name = try std.fmt.allocPrint(allocator, "test-{}", .{i}),
@@ -372,20 +400,10 @@ test "[SqlitePasteDao] insert" {
 }
 
 test "[SqlitePasteDao] query by id" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
 
     const paste1 = try dao.get_paste(allocator, 1);
     std.debug.assert(paste1 != null);
@@ -394,20 +412,10 @@ test "[SqlitePasteDao] query by id" {
 }
 
 test "[SqlitePasteDao] query by name" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
 
     const paste1 = try dao.get_paste_by_name(allocator, "test-1");
     std.debug.assert(paste1 != null);
@@ -416,20 +424,10 @@ test "[SqlitePasteDao] query by name" {
 }
 
 test "[SqlitePasteDao] query all list" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
 
     if (dao.list_pastes(allocator, null)) |paste| {
         std.debug.print("query all list: {any}\n", .{paste.?});
@@ -439,20 +437,10 @@ test "[SqlitePasteDao] query all list" {
 }
 
 test "[SqlitePasteDao] query all private list" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
 
     if (dao.list_pastes(allocator, .{
         .private = true
@@ -464,16 +452,11 @@ test "[SqlitePasteDao] query all private list" {
 }
 
 test "[SqlitePasteDao] delete by id" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
+
     const flag1 = try dao.delete_paste(10);
     std.debug.print("delete id 10: {}\n", .{flag1});
     const flag2 = try dao.delete_paste(110);
@@ -484,16 +467,11 @@ test "[SqlitePasteDao] delete by id" {
 }
 
 test "[SqlitePasteDao] delete by name" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
+
     const flag1 = try dao.delete_paste_by_name("test-20");
     std.debug.print("delete id test-20: {}\n", .{flag1});
     const flag2 = try dao.delete_paste_by_name("test-200");
@@ -501,20 +479,10 @@ test "[SqlitePasteDao] delete by name" {
 }
 
 test "[SqlitePasteDao] update" {
-    var db = try sqlite.Db.init(.{
-        .mode = sqlite.Db.Mode{ .File = "./mydata.db" },
-        .open_flags = .{
-            .write = true,
-            .create = true,
-        },
-        .threading_mode = .MultiThread,
-    });
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = &db };
-    var dao: PasteDao = sqldao.create();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    var dao: PasteDao = get_dao(allocator);
 
     if (dao.update_paste(allocator, .{
         .id = 12,
@@ -524,31 +492,5 @@ test "[SqlitePasteDao] update" {
         std.debug.print("modified id 12: {}\n", .{result.?});
     } else |e| {
         std.debug.print("modified id 12 error: {}\n", .{e});
-    }
-}
-
-test "[SqlitePasteDao] test options" {
-    const Options = @import("common").Options;
-    const DaoType = @import("common").DaoType;
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    const options = Options.init(allocator, .{
-        .dao_type = DaoType.Sqlite,
-        .work_dir = "./"
-    }) catch |e| {
-        std.debug.print("test options failed, cannot init options: {}", .{e});
-        return;
-    };
-
-    var sqldao: SqlitePasteDao = SqlitePasteDao{ .db = options.sqlite_db.? };
-    var dao: PasteDao = sqldao.create();
-        if (dao.list_pastes(allocator, .{
-        .private = false
-    })) |paste| {
-        std.debug.print("query all public list: {any}\n", .{paste.?});
-    } else |e| {
-        std.debug.print("query all public list failed: {}\n", .{e});
     }
 }

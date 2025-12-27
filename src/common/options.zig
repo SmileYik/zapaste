@@ -1,5 +1,6 @@
 const std = @import("std");
 const sqlite = @import("sqlite");
+pub const SimpleSqlitePool = @import("simple_sqlite_pool.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -10,7 +11,7 @@ pub const DaoType = enum {
 pub const Options = struct {
     dao_type: DaoType,
     work_dir: ?[]const u8 = "/app",
-    sqlite_db: ?*sqlite.Db = null,
+    sqlite: ?*SimpleSqlitePool = null,
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -23,19 +24,22 @@ pub const Options = struct {
         var options = opt;
         options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
         if (options.dao_type == DaoType.Sqlite) {
-            const db_ptr = try gpa.create(sqlite.Db);
-            errdefer gpa.destroy(db_ptr);
             const path = options.get_path(gpa, "/database.db", "/app/database.db");
             const path_z = try gpa.dupeZ(u8, path);
-            db_ptr.* = try sqlite.Db.init(.{
-                .mode = sqlite.Db.Mode{ .File = path_z },
-                .open_flags = .{
-                    .write = true,
-                    .create = true,
-                },
-                .threading_mode = .MultiThread,
-            });
-            options.sqlite_db = db_ptr;
+            
+            options.sqlite = try SimpleSqlitePool.init(
+                gpa, 
+                .{
+                    .mode = sqlite.Db.Mode{ .File = path_z },
+                    .open_flags = .{
+                        .write = true,
+                        .create = true,
+                    },
+                    .threading_mode = .MultiThread,
+                }, 
+                8,
+                10000
+            );
         }
         return options;
     }
