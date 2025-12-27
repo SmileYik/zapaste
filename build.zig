@@ -79,6 +79,8 @@ pub fn build(b: *std.Build) void {
     paste_mod.addImport("common", common_mod);
 
     mod.addImport("zap", zap.module("zap"));
+    mod.addImport("common", common_mod);
+    mod.addImport("paste", paste_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
