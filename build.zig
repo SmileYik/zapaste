@@ -73,6 +73,7 @@ pub fn build(b: *std.Build) void {
     });
 
     common_mod.addImport("sqlite", sqlite.module("sqlite"));
+    common_mod.addImport("zap", zap.module("zap"));
 
     paste_mod.addImport("sqlite", sqlite.module("sqlite"));
     paste_mod.addImport("zap", zap.module("zap"));
