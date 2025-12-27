@@ -11,6 +11,14 @@ pub fn create(comptime T: type) type {
         data: ?T = null,
         message: ?[]const u8 = null,
 
+        pub fn init(code: u16, data: ?T, message: ?[]const u8) Self {
+            return .{
+                .code = code,
+                .data = data,
+                .message = message,
+            };
+        }
+
         pub fn success(data: T, message: ?[]const u8) Self {
             return .{
                 .code = 200,
@@ -32,10 +40,10 @@ pub fn create(comptime T: type) type {
             };
         }
 
-        pub inline fn send_json(self: Self, req: zap.Request) void {
+        pub inline fn send_json(self: Self, req: zap.Request, options: std.json.Stringify.Options) void {
             var buf: [256]u8 = undefined;
             var json_to_send: []const u8 = undefined;
-            json_to_send = zap.util.stringifyBuf(&buf, self, .{}) catch |e| {
+            json_to_send = zap.util.stringifyBuf(&buf, self, options) catch |e| {
                 std.log.err("JSON failed: {s}\n", .{@errorName(e)});
                 return;
             };
