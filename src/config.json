@@ -1,0 +1,18 @@
+{
+    "dao_type": "Sqlite",
+    "work_dir": "/app",
+    "sqlite_options": {
+        "memory_mode": false,
+        "pool_size": 1,
+        "shared_cache": false,
+        "pragma": {
+            "journal_mode": "WAL",
+            "busy_timeout": "1000"
+        }
+    },
+    "bind_port": 3000,
+    "max_clients": 100000,
+    "enable_log": true,
+    "threads": 16,
+    "workers": 1
+}

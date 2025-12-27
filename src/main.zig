@@ -6,6 +6,7 @@ const SqlitePasteDao = @import("paste").SqlitePasteDao;
 const sqlite = @import("sqlite");
 const WrapperRouter = @import("zapaste").WrapperRouter;
 const Router = zap.Router;
+const zapaste = @import("zapaste");
 const Options = @import("zapaste").common.Options;
 const DaoType = @import("zapaste").common.DaoType;
 const Result = @import("zapaste").common.Result;
@@ -20,34 +21,59 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const options = Options.init(allocator, .{
-        .dao_type = DaoType.Sqlite,
-        .work_dir = "./"
-    }) catch |e| {
-        std.debug.print("test options failed, cannot init options: {}", .{e});
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+    const options_json = zapaste.get_config(allocator, if (args.len < 2) null else args[1])
+    catch |e| {
+        std.debug.print("Failed to load config: {}\n", .{e});
+        return;
+    };
+    std.debug.print(
+        \\
+        \\ Loading config:
+        \\ {f}
+        \\
+        , 
+        .{ std.json.fmt(options_json, .{ .whitespace = .indent_4 }) }
+    );
+
+    const options = Options.init(allocator, options_json) catch |e| {
+        std.debug.print("Cannot initialize: {}", .{e});
         return;
     };
 
-    var router: *WrapperRouter = try WrapperRouter.init(allocator, .{
+    var router: *WrapperRouter = WrapperRouter.init(allocator, .{
         .not_found = on_not_found
-    });
+    }) catch |e| {
+        std.debug.print("Web router initialize failed: {}", .{e});
+        return;
+    };
 
-    const paste_controller = try PasteController.init(allocator, options);
-    try paste_controller.register(allocator, router);
+    const paste_controller = PasteController.init(allocator, options)
+    catch |e| {
+        std.debug.print("PasteController initialize failed: {}", .{e});
+        return;
+    };
+
+    paste_controller.register(allocator, router)
+    catch |e| {
+        std.debug.print("PasteController register failed: {}", .{e});
+        return;
+    };
 
     var listener = zap.HttpListener.init(.{
-        .port = 3000,
+        .port = options.bind_port.?,
         .on_request = router.on_request_handler(),
-        .log = true,
-        .max_clients = 100000,
+        .log = options.enable_log.?,
+        .max_clients = options.max_clients.?,
     });
     try listener.listen();
 
     std.debug.print("Listening on 0.0.0.0:3000\n", .{});
 
     zap.start(.{
-        .threads = 10,
-        .workers = 1, // 1 worker enables sharing state between threads
+        .threads = @intCast(options.threads.?),
+        .workers = @intCast(options.workers.?),
     });
 }
 
