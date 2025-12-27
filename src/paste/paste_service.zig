@@ -22,6 +22,19 @@ pub const PasteService = struct {
         };
     }
 
+    pub fn random_string(self: *Self, allocator: std.mem.Allocator, length: usize) ![]u8 {
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const random = self.prng.?.random();
+
+        var result = try allocator.alloc(u8, length);
+        for (0..length) |i| {
+            const random_index = random.uintAtMost(usize, charset.len - 1);
+            result[i] = charset[random_index];
+        }
+        
+        return result;
+    }
+
     pub fn random_animal_name(self: *Self, gpa: Allocator) ![]const u8 {
         const random = self.prng.?.random();
         const name = self.animal_names[random.uintLessThan(usize, self.animal_names.len)];
@@ -34,17 +47,43 @@ pub const PasteService = struct {
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
+        const has_name = paste.name != null;
         var entity: Paste = try paste.dupe(temp_gpa);
         entity.name = entity.name orelse try self.random_animal_name(temp_gpa);
         entity.profiles = entity.profiles orelse "{}";
         entity.create_at = @intCast(std.time.timestamp());
         entity.latest_read_at = @intCast(std.time.timestamp());
+        
+        const password_len = std.mem.trim(u8, entity.password orelse "", " \n\r\t").len;
+        if (password_len == 0) {
+            entity.has_password = false;
+        } else {
+            entity.has_password = true;
+            // TODO some password thing,
+        }
 
         const retry = 3;
         for (0..retry) |i| {
             const result = self.dao.?.insert_paste(entity) catch |err| {
                 if (retry == i + 1) {
+                    if (err == sqlite.Error.SQLiteConstraint) {
+                        const name = try std.fmt.allocPrint(temp_gpa, "{s}-{s}", .{ 
+                            entity.name.?, try self.random_string(temp_gpa, 4)
+                        });
+                        entity.name = name;
+                        if (try self.dao.?.insert_paste(entity)) |id| {
+                            entity.id = id;
+                            break;
+                        }
+                    }
                     return err;                    
+                }
+                if (has_name) {
+                    entity.name = try std.fmt.allocPrint(temp_gpa, "{s}-{s}", .{ 
+                        entity.name.?, try self.random_string(temp_gpa, 4)
+                    });
+                } else {
+                    entity.name = try self.random_animal_name(temp_gpa);
                 }
                 continue;
             };
