@@ -3,6 +3,7 @@ const sqlite = @import("sqlite");
 const SimpleSqlitePool = @import("simple_sqlite_pool.zig");
 
 const Allocator = std.mem.Allocator;
+const StringHashMap = std.StringHashMap([]const u8);
 
 pub const DaoType = enum {
     Sqlite
@@ -10,8 +11,7 @@ pub const DaoType = enum {
 
 pub const Options = struct {
 
-    /// This is the sqlite configurations.
-    pub const SqliteOptions = struct {
+    pub const JsonSqliteOptions = struct {
         /// enable memory mode. if you set this to true, then pool_size must be 1
         memory_mode: ?bool = false,
 
@@ -25,6 +25,21 @@ pub const Options = struct {
         pragma: ?std.json.Value = null,
     };
 
+    /// This is the sqlite configurations.
+    pub const SqliteOptions = struct {
+        /// enable memory mode. if you set this to true, then pool_size must be 1
+        memory_mode: ?bool = false,
+
+        /// how many sqlite database connections.
+        pool_size: ?u16 = 2,
+
+        /// shared cache.
+        shared_cache: ?bool = false,
+
+        /// a key-value map, as same as run sql like: `SET PRAGMA KEY = VALUE`
+        pragma: ?StringHashMap = null,
+    };
+
     pub const JsonOptions = struct {
         /// dao tyoe
         dao_type: DaoType,
@@ -33,7 +48,7 @@ pub const Options = struct {
         work_dir: ?[]const u8 = "/app",
 
         /// if your dao_type is Sqlite, then you can configure your sqlite options.
-        sqlite_options: ?SqliteOptions = SqliteOptions {},
+        sqlite_options: ?JsonSqliteOptions = JsonSqliteOptions {},
 
         /// zap bind port
         bind_port: ?u16 = 3000,
@@ -66,8 +81,8 @@ pub const Options = struct {
     enable_log: ?bool = true,
     threads: ?u16 = 2,
     workers: ?u16 = 1,
-    custom_headers: ?std.json.Value = null,
-    cors_headers: ?std.json.Value = null,
+    custom_headers: ?StringHashMap = null,
+    cors_headers: ?StringHashMap = null,
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -77,21 +92,14 @@ pub const Options = struct {
     }
 
     pub fn init(gpa: Allocator, opt: JsonOptions) anyerror!Options {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
-        const temp_allocator = arena.allocator();
-
         var options: Options = .{
             .dao_type = opt.dao_type,
             .work_dir = opt.work_dir,
-            .sqlite_options = opt.sqlite_options,
             .bind_port = opt.bind_port,
             .max_clients = opt.max_clients,
             .enable_log = opt.enable_log,
             .threads = opt.threads,
             .workers = opt.workers,
-            .custom_headers = opt.custom_headers,
-            .cors_headers = opt.cors_headers,
         };
         const default_opt = Options { .dao_type = options.dao_type };
         options.work_dir = options.work_dir orelse default_opt.work_dir;
@@ -101,48 +109,60 @@ pub const Options = struct {
         options.enable_log = options.enable_log orelse default_opt.enable_log;
         options.threads = options.threads orelse default_opt.threads;
         options.workers = options.workers orelse default_opt.workers;
-        options.custom_headers = options.custom_headers orelse default_opt.custom_headers;
-        options.cors_headers = options.cors_headers orelse default_opt.cors_headers;
+
+        options.custom_headers = try json_obj_to_string_map(gpa, opt.custom_headers);
+        options.cors_headers = try json_obj_to_string_map(gpa, opt.cors_headers);
 
         const default_sqlite_opt = SqliteOptions {};
-        options.sqlite_options.?.memory_mode = options.sqlite_options.?.memory_mode orelse default_sqlite_opt.memory_mode;
-        options.sqlite_options.?.pool_size = options.sqlite_options.?.pool_size orelse default_sqlite_opt.pool_size;
-        options.sqlite_options.?.shared_cache = options.sqlite_options.?.shared_cache orelse default_sqlite_opt.shared_cache;
+        options.sqlite_options.?.memory_mode = opt.sqlite_options.?.memory_mode orelse default_sqlite_opt.memory_mode;
+        options.sqlite_options.?.pool_size = opt.sqlite_options.?.pool_size orelse default_sqlite_opt.pool_size;
+        options.sqlite_options.?.shared_cache = opt.sqlite_options.?.shared_cache orelse default_sqlite_opt.shared_cache;
+        options.sqlite_options.?.pragma = try json_obj_to_string_map(gpa,opt.sqlite_options.?.pragma);
 
         options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
         if (options.dao_type == DaoType.Sqlite) {
-            const sql_opt = options.sqlite_options orelse SqliteOptions {};
-            
-            const mode = if (sql_opt.memory_mode orelse false) blk: {
-                break :blk sqlite.Db.Mode.Memory;
-            } else blk: {
-                const path = options.get_path(temp_allocator, "/database.db", "/app/database.db");
-                const path_z = try gpa.dupeZ(u8, path);
-                break :blk sqlite.Db.Mode{ .File = path_z };
-            };
-            
-            options.sqlite = try SimpleSqlitePool.init(
-                gpa, 
-                .{
-                    .mode = mode,
-                    .open_flags = .{
-                        .write = true,
-                        .create = true,
-                    },
-                    .shared_cache = sql_opt.shared_cache.?,
-                    .threading_mode = .MultiThread,
-                }, 
-                sql_opt.pool_size.?,
-                sql_opt.pragma
-            );
+            try init_sqlite(gpa, &options);
         }
         return options;
     }
 
-    pub fn deinit(self: Options) void {
+    fn init_sqlite(allocator:Allocator, options: *Options) !void {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const temp_allocator = arena.allocator();
+
+        const sql_opt = options.sqlite_options orelse SqliteOptions {};
+        const mode = if (sql_opt.memory_mode orelse false) blk: {
+            break :blk sqlite.Db.Mode.Memory;
+        } else blk: {
+            const path = options.get_path(temp_allocator, "/database.db", "/app/database.db");
+            const path_z = try allocator.dupeZ(u8, path);
+            break :blk sqlite.Db.Mode{ .File = path_z };
+        };
+        
+        options.sqlite = try SimpleSqlitePool.init(
+            allocator, 
+            .{
+                .mode = mode,
+                .open_flags = .{
+                    .write = true,
+                    .create = true,
+                },
+                .shared_cache = sql_opt.shared_cache.?,
+                .threading_mode = .MultiThread,
+            }, 
+            sql_opt.pool_size.?,
+            sql_opt.pragma
+        );
+    }
+
+    pub fn deinit(self: *Options) void {
         defer if (self.sqlite) |pool| {
             pool.deinit();
         };
+        defer if (self.custom_headers != null) deinit_string_map(&self.custom_headers.?);
+        defer if (self.cors_headers != null) deinit_string_map(&self.cors_headers.?);
+        defer if (self.sqlite_options != null and self.sqlite_options.?.pragma != null) deinit_string_map(&self.sqlite_options.?.pragma.?);
     }
 };
 
@@ -151,4 +171,45 @@ fn dupe_str(str: ?[]const u8, comptime default_str: []const u8, gpa: Allocator) 
         return try gpa.dupe(u8, s);
     }
     return default_str;
-} 
+}
+
+inline fn deinit_string_map(map: ?*StringHashMap) void {
+    if (map) |m| {
+        var vm = m;
+        var iter = vm.iterator();
+        while (iter.next()) |entry| {
+            vm.allocator.free(entry.key_ptr.*);
+            vm.allocator.free(entry.value_ptr.*);
+        }
+        vm.deinit();
+    }
+}
+
+inline fn json_obj_to_string_map(allocator: Allocator, json_value: ?std.json.Value) !?StringHashMap {
+    if (json_value) |v| {
+        var result = StringHashMap.init(allocator);
+        switch (v) {
+            .object => |map| {
+                var iter = map.iterator();
+                while (iter.next()) |entry| {
+                    var value: ?[]const u8 = null;
+                    switch (entry.value_ptr.*) {
+                        .string => |s| value = s,
+                        .number_string => |s| value = s,
+                        else => |_| continue
+                    }
+                    std.debug.print("[CustomHeader] set custom header: {s} = {s}\n", .{
+                        entry.key_ptr.*, value.?
+                    });
+                    try result.put(
+                        try dupe_str(entry.key_ptr.*, "", allocator), 
+                        try dupe_str(value.?, "", allocator)
+                    );
+                }
+            },
+            else => return null
+        }
+        return result;
+    }
+    return null;
+}

@@ -26,25 +26,14 @@ fn custom_header_handler(r: zap.Request) !void {
     try set_custom_header(options.custom_headers, r);
 }
 
-fn set_custom_header(headers: ?std.json.Value, r: zap.Request) !void {
-    if (headers) |v| {
-        switch (v) {
-            .object => |map| {
-                var iter = map.iterator();
-                while (iter.next()) |entry| {
-                    var value: ?[]const u8 = null;
-                    switch (entry.value_ptr.*) {
-                        .string => |s| value = s,
-                        .number_string => |s| value = s,
-                        else => |_| continue
-                    }
-                    std.debug.print("[CustomHeader] set custom header: {s} = {s}\n", .{
-                        entry.key_ptr.*, value.?
-                    });
-                    try r.setHeader(entry.key_ptr.*, value.?);
-                }
-            },
-            else => return
+fn set_custom_header(headers: ?std.StringHashMap([]const u8), r: zap.Request) !void {
+    if (headers) |map| {
+        var iter = map.iterator();
+        while (iter.next()) |entry| {
+            std.debug.print("[CustomHeader] set custom header: {s} = {s}\n", .{
+                entry.key_ptr.*, entry.value_ptr.*
+            });
+            try r.setHeader(entry.key_ptr.*, entry.value_ptr.*);
         }
     }
 }
@@ -52,27 +41,20 @@ fn set_custom_header(headers: ?std.json.Value, r: zap.Request) !void {
 var options: Options = undefined;
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer if (gpa.deinit() == .leak) {
+        std.debug.print("Memory leak detected!\n", .{});
+    };
+    const gpa_allocator = gpa.allocator();
+
+    var arena = std.heap.ArenaAllocator.init(gpa_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
-    const options_json = zapaste.get_config(allocator, if (args.len < 2) null else args[1])
-    catch |e| {
-        std.debug.print("Failed to load config: {}\n", .{e});
-        return;
-    };
-    std.debug.print(
-        \\
-        \\ Loading config:
-        \\ {f}
-        \\
-        , 
-        .{ std.json.fmt(options_json, .{ .whitespace = .indent_4 }) }
-    );
 
-    options = Options.init(allocator, options_json) catch |e| {
+    options = zapaste.get_config(allocator, if (args.len < 2) null else args[1]) catch |e| {
         std.debug.print("Cannot initialize: {}", .{e});
         return;
     };

@@ -36,38 +36,27 @@ cond: std.Thread.Condition = .{},
 /// + `options`: Sqlite options,
 /// + `capacity`: pool capacity
 /// + `pragma`: configure database when connection first created.
-pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, pragma: ?std.json.Value) !*Self {
+pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, pragma: ?std.StringHashMap([]const u8)) !*Self {
     const self = try allocator.create(Self);
     const dbs = try allocator.alloc(sqlite.Db, capacity);
 
     for (0..capacity) |idx| {
         dbs[idx] = try sqlite.Db.init(options);
-        if (pragma) |v| {
-            switch (v) {
-                .object => |map| {
-                    var iter = map.iterator();
-                    while (iter.next()) |entry| {
-                        var value: ?[]const u8 = null;
-                        switch (entry.value_ptr.*) {
-                            .string => |s| value = s,
-                            .number_string => |s| value = s,
-                            else => |_| continue
-                        }
-                        std.debug.print("[SimpleSqlitePool] set pragma: {s} = {s}\n", .{
-                            entry.key_ptr.*, value.?
-                        });
-                        const pragma_sql = try std.fmt.allocPrint(allocator, "PRAGMA {s} = {s}", .{
-                            entry.key_ptr.*, 
-                            value.?
-                        });
-                        defer allocator.free(pragma_sql);
+        if (pragma) |map| {
+            var iter = map.iterator();
+            while (iter.next()) |entry| {
+                std.debug.print("[SimpleSqlitePool] set pragma: {s} = {s}\n", .{
+                    entry.key_ptr.*, entry.value_ptr.*
+                });
+                const pragma_sql = try std.fmt.allocPrint(allocator, "PRAGMA {s} = {s}", .{
+                    entry.key_ptr.*, 
+                    entry.value_ptr.*
+                });
+                defer allocator.free(pragma_sql);
 
-                        var stmt = try dbs[idx].prepareDynamic(pragma_sql);
-                        defer stmt.deinit();
-                        _ = try stmt.iterator(anyopaque, .{});
-                    }
-                },
-                else => continue
+                var stmt = try dbs[idx].prepareDynamic(pragma_sql);
+                defer stmt.deinit();
+                _ = try stmt.iterator(anyopaque, .{});
             }
         }
     }
