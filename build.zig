@@ -41,12 +41,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    const entities_mod = b.addModule("entities", .{
-        .root_source_file = b.path("src/entity/root.zig"),
-        .target = target,
-        .optimize = optimize
-    });
-
     const common_mod = b.addModule("common", .{
         .root_source_file = b.path("src/common/root.zig"),
         .target = target,
@@ -120,9 +114,7 @@ pub fn build(b: *std.Build) void {
                 // repeated because you are allowed to rename your imports, which
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
-                .{ .name = "zapaste", .module = mod },
-                .{ .name = "entities", .module = entities_mod},
-                .{ .name = "paste", .module = paste_mod}
+                .{ .name = "zapaste", .module = mod }
             },
         }),
     });

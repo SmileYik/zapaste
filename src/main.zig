@@ -1,19 +1,16 @@
 const std = @import("std");
 const zap = @import("zap");
-const Paste = @import("paste").Paste;
-const PasteDao = @import("paste").PasteDao;
-const SqlitePasteDao = @import("paste").SqlitePasteDao;
-const sqlite = @import("sqlite");
-const WrapperRouter = @import("zapaste").WrapperRouter;
-const Router = zap.Router;
 const zapaste = @import("zapaste");
-const Options = @import("zapaste").common.Options;
-const DaoType = @import("zapaste").common.DaoType;
-const Result = @import("zapaste").common.Result;
-const PasteController = @import("zapaste").PasteController;
+const U8Result = zapaste.common.Result.U8Result;
+const WrapperRouter = zapaste.common.WrapperRouter;
+const Options = zapaste.common.Options;
+const PasteController = zapaste.paste.PasteController;
+
+// const Router = zap.Router;
+// const DaoType = zapaste.common.DaoType;
 
 fn on_not_found(r: zap.Request) !void {
-    return Result.create(u8).init(404, null, null).send_json(r, .{ .emit_null_optional_fields = false });
+    return U8Result.init(404, null, null).send_json(r, .{ .emit_null_optional_fields = false });
 }
 
 pub fn main() !void {
@@ -55,7 +52,7 @@ pub fn main() !void {
         return;
     };
 
-    paste_controller.register(allocator, router)
+    paste_controller.register(allocator, router, "/api/paste")
     catch |e| {
         std.debug.print("PasteController register failed: {}", .{e});
         return;

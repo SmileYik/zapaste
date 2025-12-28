@@ -1,6 +1,6 @@
 const std = @import("std");
 const sqlite = @import("sqlite");
-pub const SimpleSqlitePool = @import("simple_sqlite_pool.zig");
+const SimpleSqlitePool = @import("simple_sqlite_pool.zig");
 
 const Allocator = std.mem.Allocator;
 

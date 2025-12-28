@@ -1,14 +1,18 @@
 const std = @import("std");
 const zap = @import("zap");
 const common = @import("common");
-const paste = @import("paste");
-const WrapperRouter = @import("variable_router.zig").WrapperRouter;
+const Paste = @import("paste.zig").Paste;
+const PasteDao = @import("paste_dao.zig").PasteDao;
+const SqlitePasteDao = @import("paste_dao.zig").SqlitePasteDao;
+const PasteService = @import("paste_service.zig").PasteService;
+
+const WrapperRouter = common.WrapperRouter;
 
 const Allocator = std.mem.Allocator;
 
 pub const Self = @This();
 
-service: ?paste.PasteService = undefined,
+service: ?PasteService = undefined,
 
 pub fn init(allocator: Allocator, options: common.Options) !*Self {
     var self: *Self = try allocator.create(Self);
@@ -17,12 +21,12 @@ pub fn init(allocator: Allocator, options: common.Options) !*Self {
     };
     switch (options.dao_type) {
         .Sqlite => |_| {
-            var sqldao: *paste.SqlitePasteDao = try allocator.create(paste.SqlitePasteDao);
+            var sqldao: *SqlitePasteDao = try allocator.create(SqlitePasteDao);
             sqldao.* = .{ .pool = options.sqlite.? };
-            const dao = try allocator.create(paste.PasteDao);
+            const dao = try allocator.create(PasteDao);
             dao.* = sqldao.create();
             try dao.create_table_if_not_exists();
-            self.service = paste.PasteService.create(.{
+            self.service = PasteService.create(.{
                 .dao = dao
             });
         },
@@ -30,19 +34,24 @@ pub fn init(allocator: Allocator, options: common.Options) !*Self {
     return self;
 }
 
-pub fn register(self: *Self, allocator: Allocator, router: *WrapperRouter) !void {
+pub fn register(
+    self: *Self, 
+    allocator: Allocator, 
+    router: *WrapperRouter, 
+    comptime prefix_path: []const u8
+) !void {
     const get_router = try router.special(allocator, .GET);
-    try get_router.handle_func_bound("/paste", self, &list_public_pastes);
-    try get_router.handle_var_func_bound(allocator, "/paste/:name", self, &get_unlocked_paste);
+    try get_router.handle_func_bound(prefix_path ++ "/", self, &list_public_pastes);
+    try get_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &get_unlocked_paste);
 
     const post_router = try router.special(allocator, .POST);
-    try post_router.handle_func_bound("/paste", self, &create_paste);
-    try post_router.handle_var_func_bound(allocator, "/paste/:name", self, &get_locked_paste);
+    try post_router.handle_func_bound(prefix_path ++ "", self, &create_paste);
+    try post_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &get_locked_paste);
 }
 
-const PastePageResult = common.Result.create(paste.Paste.Page);
+const PastePageResult = common.Result.create(Paste.Page);
 
-const PasteResult = common.Result.create(paste.Paste);
+const PasteResult = common.Result.create(Paste);
 
 const PasswordModel = struct {
     password: ?[]const u8 = null
@@ -209,7 +218,7 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         no_valid_payload.send_json(req, strip_null_field);
         return;
     }
-    const parsed = try std.json.parseFromSlice(paste.Paste, allocator, paste_json.?, .{
+    const parsed = try std.json.parseFromSlice(Paste, allocator, paste_json.?, .{
         .ignore_unknown_fields = true,
         .allocate = .alloc_always,
     });
