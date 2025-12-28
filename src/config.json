@@ -3,7 +3,7 @@
     "work_dir": "/app",
     "sqlite_options": {
         "memory_mode": false,
-        "pool_size": 1,
+        "pool_size": 2,
         "shared_cache": false,
         "pragma": {
             "journal_mode": "WAL",
@@ -13,6 +13,6 @@
     "bind_port": 3000,
     "max_clients": 100000,
     "enable_log": true,
-    "threads": 16,
+    "threads": 2,
     "workers": 1
 }

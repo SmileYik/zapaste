@@ -10,21 +10,44 @@ pub const DaoType = enum {
 
 pub const Options = struct {
 
+    /// This is the sqlite configurations.
     pub const SqliteOptions = struct {
+        /// enable memory mode. if you set this to true, then pool_size must be 1
         memory_mode: ?bool = false,
-        pool_size: ?u16 = 8,
+
+        /// how many sqlite database connections.
+        pool_size: ?u16 = 2,
+
+        /// shared cache.
         shared_cache: ?bool = false,
+
+        /// a key-value map, as same as run sql like: `SET PRAGMA KEY = VALUE`
         pragma: ?std.json.Value = null,
     };
 
     pub const JsonOptions = struct {
+        /// dao tyoe
         dao_type: DaoType,
+
+        /// work dir, where data stored
         work_dir: ?[]const u8 = "/app",
+
+        /// if your dao_type is Sqlite, then you can configure your sqlite options.
         sqlite_options: ?SqliteOptions = SqliteOptions {},
+
+        /// zap bind port
         bind_port: ?u16 = 3000,
+
+        /// zap max clients
         max_clients: ?isize = 100000,
+
+        /// zap enable log
         enable_log: ?bool = true,
-        threads: ?u16 = 16,
+
+        /// how many threads handle http request
+        threads: ?u16 = 2,
+
+        /// how many workers, cannot share memory between workers.
         workers: ?u16 = 1,
     };
 
@@ -35,7 +58,7 @@ pub const Options = struct {
     bind_port: ?u16 = 3000,
     max_clients: ?isize = 100000,
     enable_log: ?bool = true,
-    threads: ?u16 = 16,
+    threads: ?u16 = 2,
     workers: ?u16 = 1,
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
