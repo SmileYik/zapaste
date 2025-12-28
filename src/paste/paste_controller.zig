@@ -41,11 +41,11 @@ pub fn register(
     comptime prefix_path: []const u8
 ) !void {
     const get_router = try router.special(allocator, .GET);
-    try get_router.handle_func_bound(prefix_path ++ "/", self, &list_public_pastes);
+    try get_router.handle_func_bound(prefix_path, self, &list_public_pastes);
     try get_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &get_unlocked_paste);
 
     const post_router = try router.special(allocator, .POST);
-    try post_router.handle_func_bound(prefix_path ++ "", self, &create_paste);
+    try post_router.handle_func_bound(prefix_path, self, &create_paste);
     try post_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &get_locked_paste);
 }
 
@@ -195,7 +195,7 @@ fn list_public_pastes(self: *Self, req: zap.Request) !void {
 /// params: `paste={JSON}`, `{JSON}` is `Paste` type. 
 /// 
 fn create_paste(self: *Self, req: zap.Request) !void {
-    const no_valid_payload = comptime PasteResult.init(500, null, "No valid payload");
+    const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -206,16 +206,26 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         no_valid_payload.send_json(req, strip_null_field);
         return;
     }
-    try req.parseBody();
-    const body = try req.parametersToOwnedList(allocator);
+    const content_type = req.getHeaderCommon(.content_type);
+    if (content_type == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+
     var paste_json: ?[] const u8 = null;
-    for (body.items) |item| {
-        if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
-            switch (item.value.?) {
-                .String => |s| paste_json = s,
-                else => continue
+    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) {
+        paste_json = req.body;
+    } else {
+        try req.parseBody();
+        const body = try req.parametersToOwnedList(allocator);
+        for (body.items) |item| {
+            if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
+                switch (item.value.?) {
+                    .String => |s| paste_json = s,
+                    else => continue
+                }
+                break;
             }
-            break;
         }
     }
 
