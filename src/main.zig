@@ -3,6 +3,7 @@ const zap = @import("zap");
 const zapaste = @import("zapaste");
 const U8Result = zapaste.common.Result.U8Result;
 const WrapperRouter = zapaste.common.WrapperRouter;
+const RouterError = zapaste.common.RouterError;
 const Options = zapaste.common.Options;
 const PasteController = zapaste.paste.PasteController;
 
@@ -12,6 +13,43 @@ const PasteController = zapaste.paste.PasteController;
 fn on_not_found(r: zap.Request) !void {
     return U8Result.init(404, null, null).send_json(r, .{ .emit_null_optional_fields = false });
 }
+
+fn cors_handler(r: zap.Request) !void {
+    if (r.methodAsEnum() == .OPTIONS) {
+        try set_custom_header(options.cors_headers, r);
+        r.setStatus(.ok);
+        r.markAsFinished(true);
+    }
+}
+
+fn custom_header_handler(r: zap.Request) !void {
+    try set_custom_header(options.custom_headers, r);
+}
+
+fn set_custom_header(headers: ?std.json.Value, r: zap.Request) !void {
+    if (headers) |v| {
+        switch (v) {
+            .object => |map| {
+                var iter = map.iterator();
+                while (iter.next()) |entry| {
+                    var value: ?[]const u8 = null;
+                    switch (entry.value_ptr.*) {
+                        .string => |s| value = s,
+                        .number_string => |s| value = s,
+                        else => |_| continue
+                    }
+                    std.debug.print("[CustomHeader] set custom header: {s} = {s}\n", .{
+                        entry.key_ptr.*, value.?
+                    });
+                    try r.setHeader(entry.key_ptr.*, value.?);
+                }
+            },
+            else => return
+        }
+    }
+}
+
+var options: Options = undefined;
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -34,14 +72,18 @@ pub fn main() !void {
         .{ std.json.fmt(options_json, .{ .whitespace = .indent_4 }) }
     );
 
-    var options = Options.init(allocator, options_json) catch |e| {
+    options = Options.init(allocator, options_json) catch |e| {
         std.debug.print("Cannot initialize: {}", .{e});
         return;
     };
     defer options.deinit();
 
     var router: *WrapperRouter = WrapperRouter.init(allocator, .{
-        .not_found = on_not_found
+        .not_found = on_not_found,
+        .interceptors = &[_]zap.HttpRequestFn {
+            &custom_header_handler,
+            &cors_handler
+        }
     }) catch |e| {
         std.debug.print("Web router initialize failed: {}", .{e});
         return;

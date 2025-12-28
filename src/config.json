@@ -14,5 +14,12 @@
     "max_clients": 100000,
     "enable_log": true,
     "threads": 2,
-    "workers": 1
+    "workers": 1,
+    "custom_headers": {
+        "Access-Control-Allow-Origin": "*"
+    },
+    "cors_headers": {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    }
 }

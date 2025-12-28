@@ -1,9 +1,16 @@
 const std = @import("std");
 const zap = @import("zap");
+const U8Result = @import("result.zig").U8Result;
 const Router = zap.Router;
 
 pub const RouterOptions = struct {
-    not_found: ?zap.HttpRequestFn = null
+    not_found: ?zap.HttpRequestFn = null,
+    interceptors: ?[]const zap.HttpRequestFn = null,
+};
+
+pub const RouterError = error {
+    InterceptorReject,
+    InterceptorFastReturn,
 };
 
 /// This router similiar with zap.Router
@@ -256,12 +263,14 @@ pub const WrapperRouter = struct {
 
     router_map: RouterMap,
     not_found: ?zap.HttpRequestFn = null,
+    interceptors: ?[]const zap.HttpRequestFn,
 
     pub fn init(allocator: std.mem.Allocator, options: RouterOptions) !*WrapperRouter {
         const r = try allocator.create(WrapperRouter);
         r.* = .{
             .router_map = RouterMap.init(allocator),
             .not_found = options.not_found orelse null,
+            .interceptors = options.interceptors
         };
         return r;
     }
@@ -296,6 +305,35 @@ pub const WrapperRouter = struct {
     }
 
     fn serve(self: *WrapperRouter, r: zap.Request) !void {
+
+        if (self.interceptors) |interceptors| {
+            for (interceptors) |inte| {
+                var ee: ?anyerror = null;
+                var message: ?[]const u8 = null;
+                inte(r) catch |err| switch (err) {
+                    RouterError.InterceptorReject => |e| {
+                        ee = e;
+                        message = "Blocked";
+                    },
+                    else => |e| {
+                        ee = e;
+                        message = "Unknow Error";
+                    }
+                };
+                if (ee) |e| {
+                    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+                    defer arena.deinit();
+                    const allocator = arena.allocator();
+                    const result = try U8Result.failed(allocator, e, message.?);
+                    result.send_json(r, .{ .emit_null_optional_fields = false });
+                    return;
+                }
+                if (r.isFinished()) {
+                    return;
+                }
+            }
+        }
+
         const method = r.methodAsEnum();
         if (self.router_map.get(method)) |dispatch| {
             try dispatch.on_request_handler()(r);

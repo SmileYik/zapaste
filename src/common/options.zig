@@ -49,6 +49,12 @@ pub const Options = struct {
 
         /// how many workers, cannot share memory between workers.
         workers: ?u16 = 1,
+
+        /// custom headers for all http request
+        custom_headers: ?std.json.Value = null,
+
+        // cors headers will set to OPTIONS requests only
+        cors_headers: ?std.json.Value = null,
     };
 
     dao_type: DaoType,
@@ -60,6 +66,8 @@ pub const Options = struct {
     enable_log: ?bool = true,
     threads: ?u16 = 2,
     workers: ?u16 = 1,
+    custom_headers: ?std.json.Value = null,
+    cors_headers: ?std.json.Value = null,
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -82,6 +90,8 @@ pub const Options = struct {
             .enable_log = opt.enable_log,
             .threads = opt.threads,
             .workers = opt.workers,
+            .custom_headers = opt.custom_headers,
+            .cors_headers = opt.cors_headers,
         };
         const default_opt = Options { .dao_type = options.dao_type };
         options.work_dir = options.work_dir orelse default_opt.work_dir;
@@ -91,6 +101,8 @@ pub const Options = struct {
         options.enable_log = options.enable_log orelse default_opt.enable_log;
         options.threads = options.threads orelse default_opt.threads;
         options.workers = options.workers orelse default_opt.workers;
+        options.custom_headers = options.custom_headers orelse default_opt.custom_headers;
+        options.cors_headers = options.cors_headers orelse default_opt.cors_headers;
 
         const default_sqlite_opt = SqliteOptions {};
         options.sqlite_options.?.memory_mode = options.sqlite_options.?.memory_mode orelse default_sqlite_opt.memory_mode;

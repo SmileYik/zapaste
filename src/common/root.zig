@@ -9,6 +9,7 @@ pub const SimpleSqlitePool = @import("simple_sqlite_pool.zig");
 pub const PageList = @import("page_list.zig").PageList;
 
 const variable_router = @import("variable_router.zig");
+pub const RouterError = variable_router.RouterError;
 pub const VariableRouter = variable_router.VariableRouter;
 pub const WrapperRouter = variable_router.WrapperRouter;
 pub const RouterOptions = variable_router.RouterOptions;
