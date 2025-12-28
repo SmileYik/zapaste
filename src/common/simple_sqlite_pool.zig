@@ -35,6 +35,7 @@ cond: std.Thread.Condition = .{},
 /// ## params
 /// + `options`: Sqlite options,
 /// + `capacity`: pool capacity
+/// + `pragma`: configure database when connection first created.
 pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, pragma: ?std.json.Value) !*Self {
     const self = try allocator.create(Self);
     const dbs = try allocator.alloc(sqlite.Db, capacity);
@@ -64,7 +65,6 @@ pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, pr
                         var stmt = try dbs[idx].prepareDynamic(pragma_sql);
                         defer stmt.deinit();
                         _ = try stmt.iterator(anyopaque, .{});
-                        // _ = try dbs[idx].pragmaAlloc(void, .{}, entry.key_ptr.*, entry.value_ptr.*);
                     }
                 },
                 else => continue
