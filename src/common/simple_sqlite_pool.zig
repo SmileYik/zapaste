@@ -82,8 +82,8 @@ pub fn init(allocator: Allocator, options: sqlite.InitOptions, capacity: u32, pr
 
 /// deinit pool
 pub fn deinit(self: *Self) void {
-    for (self.dbs) |db| {
-        db.deinit();
+    for (0..self.dbs.len) |i| {
+        self.dbs[i].deinit();
     }
 }
 

@@ -34,10 +34,11 @@ pub fn main() !void {
         .{ std.json.fmt(options_json, .{ .whitespace = .indent_4 }) }
     );
 
-    const options = Options.init(allocator, options_json) catch |e| {
+    var options = Options.init(allocator, options_json) catch |e| {
         std.debug.print("Cannot initialize: {}", .{e});
         return;
     };
+    defer options.deinit();
 
     var router: *WrapperRouter = WrapperRouter.init(allocator, .{
         .not_found = on_not_found
@@ -45,6 +46,7 @@ pub fn main() !void {
         std.debug.print("Web router initialize failed: {}", .{e});
         return;
     };
+    defer router.deinit();
 
     const paste_controller = PasteController.init(allocator, options)
     catch |e| {

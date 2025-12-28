@@ -126,6 +126,12 @@ pub const Options = struct {
         }
         return options;
     }
+
+    pub fn deinit(self: Options) void {
+        defer if (self.sqlite) |pool| {
+            pool.deinit();
+        };
+    }
 };
 
 fn dupe_str(str: ?[]const u8, comptime default_str: []const u8, gpa: Allocator) ![]const u8 {

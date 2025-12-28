@@ -191,8 +191,7 @@ pub const VariableRouter = struct {
     }
 
     pub fn deinit(self: *VariableRouter) void {
-        self.routes.deinit();
-        self.inner_router.deinit();
+        defer self.inner_router.deinit();
     }
 
     pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
@@ -268,7 +267,7 @@ pub const WrapperRouter = struct {
     }
 
     pub fn deinit(self: *WrapperRouter) void {
-        const iter = self.router_map.valueIterator();
+        var iter = self.router_map.valueIterator();
         while (iter.next()) |r| {
             r.*.deinit();
         }
