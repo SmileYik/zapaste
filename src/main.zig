@@ -72,6 +72,14 @@ pub fn main() !void {
     };
     defer router.deinit();
 
+    const swagger_controller = try zapaste.swagger.SwaggerController.init(
+        allocator, router, "/swagger", &options
+    );
+    if (swagger_controller != null) {
+        defer allocator.destroy(swagger_controller.?);
+        zapaste.swagger.SwaggerController.info(options.bind_port.?);
+    }
+
     const paste_controller = PasteController.init(allocator, options)
     catch |e| {
         std.debug.print("PasteController initialize failed: {}", .{e});
@@ -92,7 +100,7 @@ pub fn main() !void {
     });
     try listener.listen();
 
-    std.debug.print("Listening on 0.0.0.0:3000\n", .{});
+    std.debug.print("Listening on 0.0.0.0:{}\n", .{ options.bind_port.? });
 
     zap.start(.{
         .threads = @intCast(options.threads.?),

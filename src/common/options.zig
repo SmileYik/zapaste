@@ -11,6 +11,18 @@ pub const DaoType = enum {
 
 pub const Options = struct {
 
+    pub const JsonSwaggerOptions = struct {
+        enable: ?bool = false,
+        swagger_config_path: ?[]const u8 = "openapi.yml",
+        swagger_index_path: ?[]const u8 = null,
+    };
+
+    pub const SwaggerOptions = struct {
+        enable: ?bool = false,
+        swagger_config_path: ?[]const u8 = "openapi.yml",
+        swagger_index_path: ?[]const u8 = null,
+    };
+
     pub const JsonSqliteOptions = struct {
         /// enable memory mode. if you set this to true, then pool_size must be 1
         memory_mode: ?bool = false,
@@ -70,6 +82,7 @@ pub const Options = struct {
 
         // cors headers will set to OPTIONS requests only
         cors_headers: ?std.json.Value = null,
+        swagger: ?JsonSwaggerOptions = JsonSwaggerOptions {},
     };
 
     dao_type: DaoType,
@@ -83,6 +96,7 @@ pub const Options = struct {
     workers: ?u16 = 1,
     custom_headers: ?StringHashMap = null,
     cors_headers: ?StringHashMap = null,
+    swagger: ?SwaggerOptions = SwaggerOptions {},
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -118,6 +132,16 @@ pub const Options = struct {
         options.sqlite_options.?.pool_size = opt.sqlite_options.?.pool_size orelse default_sqlite_opt.pool_size;
         options.sqlite_options.?.shared_cache = opt.sqlite_options.?.shared_cache orelse default_sqlite_opt.shared_cache;
         options.sqlite_options.?.pragma = try json_obj_to_string_map(gpa,opt.sqlite_options.?.pragma);
+
+        if (opt.swagger) |s| {
+            options.swagger.?.enable = s.enable;
+            if (s.swagger_config_path) |p| {
+                options.swagger.?.swagger_config_path = try dupe_str(p, "/openapi.yml", gpa);
+            }
+            if (s.swagger_index_path) |p| {
+                options.swagger.?.swagger_index_path = try dupe_str(p, "/swagger.html", gpa);
+            }
+        }
 
         options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
         if (options.dao_type == DaoType.Sqlite) {
@@ -198,9 +222,6 @@ inline fn json_obj_to_string_map(allocator: Allocator, json_value: ?std.json.Val
                         .number_string => |s| value = s,
                         else => |_| continue
                     }
-                    std.debug.print("[CustomHeader] set custom header: {s} = {s}\n", .{
-                        entry.key_ptr.*, value.?
-                    });
                     try result.put(
                         try dupe_str(entry.key_ptr.*, "", allocator), 
                         try dupe_str(value.?, "", allocator)

@@ -1,0 +1,207 @@
+openapi: 3.0.0
+info:
+  title: Zapaste API
+  description: |
+    基于 Zig 和 Zap 框架构建的粘贴板服务。
+    支持：
+    - 公开粘贴板的分页列表获取
+    - 带有密码保护的粘贴内容读取
+    - 自动脱敏（返回结果自动抹除密码字段）
+    - Raw 原始文本模式输出
+  version: 1.0.0
+
+# 本地服务器配置
+servers:
+  - url: http://localhost:3000/api
+    description: 本地开发测试环境
+
+paths:
+  /paste:
+    get:
+      summary: 获取公开粘贴板列表
+      description: 返回所有公开粘贴板的摘要信息。
+      parameters:
+        - name: page_size
+          in: query
+          description: 每页返回的数量，默认 10
+          schema:
+            type: integer
+            default: 10
+        - name: page_no
+          in: query
+          description: 当前页码，默认 1
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: 成功返回分页摘要列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PastePageResult'
+
+    post:
+      summary: 创建新粘贴板
+      description: |
+        支持两种方式调用：
+        1. 直接发送 JSON (`application/json`)
+        2. 通过表单字段 `paste` 发送 JSON 字符串 (`application/x-www-form-urlencoded`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Paste'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                paste:
+                  type: string
+                  description: Paste 对象的 JSON 序列化字符串
+              required:
+                - paste
+      responses:
+        '200':
+          description: 创建成功，返回包含 ID 的完整对象
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+
+  /paste/{name}:
+    get:
+      summary: 获取未加密粘贴
+      description: 如果粘贴板设有密码，此接口将返回错误。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 粘贴板的唯一名称
+          schema:
+            type: string
+        - name: raw
+          in: query
+          description: 是否仅获取原始文本内容
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        '200':
+          description: 成功获取。根据 raw 参数返回 JSON 或纯文本。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: 粘贴不存在或名称为空
+
+    post:
+      summary: 获取加密粘贴板
+      description: 需在 **请求体** 中提供密码。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: raw
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordModel'
+      responses:
+        '200':
+          description: 密码正确，返回粘贴板内容
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: 验证失败（密码错误或未提供密码）
+
+components:
+  schemas:
+    # 核心模型：对应 Zig 中的 Paste 结构体
+    Paste:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        name: { type: string, nullable: true }
+        content: { type: string, nullable: true, description: "粘贴板的文本内容" }
+        content_type: { type: string, nullable: true, description: "粘贴板文本类型" }
+        attachements: { type: string, nullable: true }
+        private: { type: boolean, nullable: true }
+        read_only: { type: boolean, nullable: true }
+        editable: { type: boolean, nullable: true }
+        has_password: { type: boolean, nullable: true }
+        read_count: { type: integer, format: int64, nullable: true }
+        burn_after_reads: { type: integer, format: int64, nullable: true }
+        create_at: { type: integer, format: int64, nullable: true }
+        expiration_at: { type: integer, format: int64, nullable: true }
+        profiles: { type: string, nullable: true }
+
+    # 摘要模型：对应 Zig 中的 Summary 结构体
+    PasteSummary:
+      type: object
+      properties:
+        id: { type: integer, format: int64, nullable: true }
+        name: { type: string, nullable: true }
+        content_type: { type: string, nullable: true }
+        read_only: { type: boolean, nullable: true }
+        has_password: { type: boolean, nullable: true }
+        read_count: { type: integer, format: int64, nullable: true }
+        create_at: { type: integer, format: int64, nullable: true }
+
+    # 分页列表封装：对应 PageList(Summary)
+    PastePage:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PasteSummary'
+        page_size: { type: integer }
+        page_no: { type: integer }
+        page_count: { type: integer }
+        total: { type: integer, format: int64 }
+
+    # 密码请求模型
+    PasswordModel:
+      type: object
+      properties:
+        password: { type: string, nullable: true }
+
+    # 通用响应包装：对应 common.Result.create(T)
+    PasteResult:
+      type: object
+      properties:
+        code: { type: integer, example: 200, description: "业务状态码" }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Paste'
+          nullable: true
+        message: { type: string, nullable: true }
+
+    PastePageResult:
+      type: object
+      properties:
+        code: { type: integer, example: 200 }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PastePage'
+          nullable: true
+        message: { type: string, nullable: true }

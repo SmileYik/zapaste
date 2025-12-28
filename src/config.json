@@ -10,6 +10,11 @@
             "busy_timeout": "1000"
         }
     },
+    "swagger": {
+        "enable": false,
+        "swagger_config_path": "/openapi.yml",
+        "swagger_index_path": null
+    },
     "bind_port": 3000,
     "max_clients": 100000,
     "enable_log": true,

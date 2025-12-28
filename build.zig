@@ -53,6 +53,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
+    const swagger_mod = b.addModule("swagger", .{
+        .root_source_file = b.path("src/swagger/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
     // zap dependency
     const zap = b.dependency("zap", .{
         .target = target,
@@ -73,9 +79,13 @@ pub fn build(b: *std.Build) void {
     paste_mod.addImport("zap", zap.module("zap"));
     paste_mod.addImport("common", common_mod);
 
+    swagger_mod.addImport("common", common_mod);
+    swagger_mod.addImport("zap", zap.module("zap"));
+
     mod.addImport("zap", zap.module("zap"));
     mod.addImport("common", common_mod);
     mod.addImport("paste", paste_mod);
+    mod.addImport("swagger", swagger_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function

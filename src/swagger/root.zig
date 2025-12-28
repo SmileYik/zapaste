@@ -1,0 +1,1 @@
+pub const SwaggerController = @import("swagger_controller.zig");

@@ -2,6 +2,7 @@
 const std = @import("std");
 pub const paste = @import("paste");
 pub const common = @import("common");
+pub const swagger = @import("swagger");
 
 pub fn get_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common.Options {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -16,8 +17,9 @@ pub fn get_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common.
 
     std.debug.print(
         \\
-        \\ Loading config:
+        \\Loading config:
         \\ {f}
+        \\
         \\
         , 
         .{ std.json.fmt(options_json, .{ .whitespace = .indent_4 }) }
