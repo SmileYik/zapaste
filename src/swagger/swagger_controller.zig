@@ -1,6 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
 const common = @import("common");
+const res = @import("res");
 
 const WrapperRouter = common.WrapperRouter;
 
@@ -8,7 +9,8 @@ const Allocator = std.mem.Allocator;
 
 pub const Self = @This();
 
-index: []const u8 = @embedFile("./swagger.html"),
+index: []const u8 = res.file("swagger/swagger.html"),
+default_api: []const u8 = res.file("swagger/openapi.yml"),
 index_file: ?[]const u8 = null,
 api_file: ?[]const u8 = null,
 
@@ -76,6 +78,12 @@ fn get_swagger_index(self: *Self, r: zap.Request) !void {
 
 fn get_swagger_config(self: *Self, r: zap.Request) !void {
     errdefer common.Result.UnknownError.send_json(r, .{ .emit_null_optional_fields = false });
-    if (self.api_file) |file| try r.sendFile(file)
-    else try r.sendBody("");
+    
+    var failed: bool = false;
+    if (self.api_file) |file| r.sendFile(file) catch {
+        failed = true;
+    };
+    if (failed) {
+        try r.sendBody(self.default_api);
+    }
 }

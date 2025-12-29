@@ -3,6 +3,7 @@ const std = @import("std");
 pub const paste = @import("paste");
 pub const common = @import("common");
 pub const swagger = @import("swagger");
+pub const res = @import("res");
 
 pub fn get_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common.Options {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -35,7 +36,7 @@ fn get_json_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common
         break :blk result;
     } else blk: {
         std.debug.print("Use default config\n", .{});
-        break :blk @embedFile("config.json");
+        break :blk res.file("config.json");
     };
     const parsed = try std.json.parseFromSlice(
         common.Options.JsonOptions, 

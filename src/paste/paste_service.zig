@@ -1,6 +1,7 @@
+const std = @import("std");
 const PasteDao = @import("paste_dao.zig").PasteDao;
 const Paste = @import("paste.zig").Paste;
-const std = @import("std");
+const res = @import("res");
 const Random = std.Random;
 const Allocator = std.mem.Allocator;
 
@@ -9,8 +10,8 @@ pub const PasteService = struct {
 
     dao: ?*PasteDao = null,
     prng: ?Random.DefaultPrng = null,
-    animal_names: []const []const u8 = split_static_file("animals.txt"),
-    animal_adjectives: []const []const u8 = split_static_file("adjectives.txt"),
+    animal_names: []const []const u8 = split_static_file("paste/animals.txt"),
+    animal_adjectives: []const []const u8 = split_static_file("paste/adjectives.txt"),
 
     /// create paste service instance. dao instance is required, others all optional.
     pub fn create(config: Self) PasteService {
@@ -167,7 +168,7 @@ pub const PasteService = struct {
 
 fn split_static_file(comptime filename: []const u8) []const []const u8 {
     @setEvalBranchQuota(2000000);
-    const content = @embedFile(filename);
+    const content = res.file(filename);
     var count: usize = 0;
     var iter = std.mem.splitSequence(u8, content, "\n");
     while (iter.next()) |line| {

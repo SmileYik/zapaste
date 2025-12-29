@@ -41,6 +41,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const res_mod = b.createModule(.{
+        .root_source_file = b.path("resources/root.zig"),
+    });
+    
     const common_mod = b.addModule("common", .{
         .root_source_file = b.path("src/common/root.zig"),
         .target = target,
@@ -80,14 +84,17 @@ pub fn build(b: *std.Build) void {
     paste_mod.addImport("sqlite", sqlite.module("sqlite"));
     paste_mod.addImport("zap", zap.module("zap"));
     paste_mod.addImport("common", common_mod);
+    paste_mod.addImport("res", res_mod);
 
     swagger_mod.addImport("common", common_mod);
     swagger_mod.addImport("zap", zap.module("zap"));
+    swagger_mod.addImport("res", res_mod);
 
     mod.addImport("zap", zap.module("zap"));
     mod.addImport("common", common_mod);
     mod.addImport("paste", paste_mod);
     mod.addImport("swagger", swagger_mod);
+    mod.addImport("res", res_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
