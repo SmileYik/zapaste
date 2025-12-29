@@ -7,12 +7,14 @@ on:
       - 'src/**'
       - 'resources/**'
       - 'build.*'
+      - '.github/**'
   pull_request:
     branches: [ "master" ]
     paths:
       - 'src/**'
       - 'resources/**'
       - 'build.*'
+      - '.github/**'
 
 jobs:
 
