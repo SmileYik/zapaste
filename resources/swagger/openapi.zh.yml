@@ -67,7 +67,7 @@ paths:
 
   /api/paste/{name}:
     get:
-      summary: 获取未加密粘贴
+      summary: 获取未加密粘贴版
       description: 如果粘贴板设有密码，此接口将返回错误。
       parameters:
         - name: name
@@ -127,6 +127,79 @@ paths:
                 type: string
         '500':
           description: 验证失败（密码错误或未提供密码）
+
+    delete:
+      summary: 删除未加密粘贴板
+      description: 如果粘贴板设有密码，此接口将返回错误。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: 密码验证失败, 或者没有提密码
+  
+  /api/paste/{name}/delete:
+    delete:
+      summary: 删除未加密粘贴板
+      description: 如果粘贴板设有密码，此接口将返回错误。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: 密码验证失败, 或者没有提密码
+
+    post:
+      summary: 删除带有密码保护的粘贴板
+      description: 删除带有密码保护的粘贴板, 删除时必须提供密码.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordModel'
+      responses:
+        '200':
+          description: 删除成功.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: 密码验证失败, 或者没有提密码
 
 components:
   schemas:

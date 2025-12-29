@@ -47,6 +47,11 @@ pub fn register(
     const post_router = try router.special(allocator, .POST);
     try post_router.handle_func_bound(prefix_path, self, &create_paste);
     try post_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &get_locked_paste);
+    try post_router.handle_var_func_bound(allocator, prefix_path ++ "/:name/delete", self, &delete_locked_paste);
+
+    const delete_router = try router.special(allocator, .DELETE);
+    try delete_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &delete_unlock_paste);
+    try delete_router.handle_var_func_bound(allocator, prefix_path ++ "/:name/delete", self, &delete_unlock_paste);
 }
 
 const PastePageResult = common.Result.create(Paste.Page);
@@ -245,4 +250,72 @@ fn create_paste(self: *Self, req: zap.Request) !void {
     };
 
     result.send_json(req, strip_null_field);
+}
+
+/// delete unlock paste by name
+/// 
+/// DELETE /:name/delete
+/// DELETE /:name
+/// 
+fn delete_unlock_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const name = path_variables.get("name").?;
+    try self.handle_delete_request(allocator, req, name, null);
+}
+
+/// delete paste with password, need pass `password` field
+/// 
+/// POST /:name/delete
+/// 
+/// content-type: application/json
+/// 
+/// + body: `PasswordModel`
+fn delete_locked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    if (req.body == null) {
+        result_no_password.send_json(req, strip_null_field);
+        return;
+    }
+    const parsed = try std.json.parseFromSlice(
+        PasswordModel, 
+        allocator, 
+        req.body.?, 
+        .{ .ignore_unknown_fields = true }
+    );
+    defer parsed.deinit();
+    const password_model: PasswordModel = parsed.value;
+    const name = path_variables.get("name").?;
+    try self.handle_delete_request(allocator, req, name, password_model.password);
+}
+
+inline fn handle_delete_request(
+    self: *Self, 
+    allocator: Allocator, 
+    req: zap.Request, 
+    name: []const u8, 
+    password: ?[]const u8
+) !void {
+    _ = self.service.?.delete_paste(allocator, name, password, false)
+    catch |err| switch (err) {
+        error.PasswordRequired => {
+            result_no_password.send_json(req, strip_null_field);
+            return;
+        },
+        else => |e| {
+            const result = try PasteResult.failed(allocator, e, "failed to delete");
+            result.send_json(req, strip_null_field);
+            return;
+        }
+    };
+    PasteResult.success(null, "deleted").send_json(req, strip_null_field);
 }

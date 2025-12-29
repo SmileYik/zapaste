@@ -104,13 +104,7 @@ pub const PasteService = struct {
         }
         const paste = try self.find_paste(gpa, query.name.?);
         if (paste) |p| {
-            var success: bool = true;
-            if (p.has_password != null and p.has_password.?) {
-                if (!std.mem.eql(u8, p.password orelse "", query.password orelse "")) {
-                    success = false;
-                }
-            }
-            if (success) {
+            if (check_paste_passwod(&p, query.password)) {
                 self.increase_read_count(p) catch |e| {
                     std.log.debug("[PasteService] failed increase read count: {}", .{e});
                 };
@@ -120,6 +114,30 @@ pub const PasteService = struct {
             }
         }
         return null;
+    }
+
+    /// delete paste by name, will check password, if real delete a paste then return true, else return false.
+    /// if you set `force_delete` to `true`, then will ignore password
+    pub fn delete_paste(self: *Self, allocator: Allocator, name: []const u8, password: ?[]const u8, force_delete :bool) !bool {
+        const paste = try self.find_paste(allocator, name);
+        if (paste) |p| {
+            if (force_delete or check_paste_passwod(&p, password)) {
+                _ = try self.dao.?.delete_paste_by_name(name);
+                return true;
+            }
+            return error.PasswordRequired;
+        }
+        return false;
+    }
+    
+    inline fn check_paste_passwod(paste: *const Paste, password: ?[]const u8) bool {
+        var success: bool = true;
+        if (paste.has_password != null and paste.has_password.?) {
+            if (!std.mem.eql(u8, paste.password orelse "", password orelse "")) {
+                success = false;
+            }
+        }
+        return success;
     }
 
     pub fn find_paste(self: *Self, gpa: Allocator, paste_name: []const u8) !?Paste {

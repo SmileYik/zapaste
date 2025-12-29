@@ -131,6 +131,84 @@ paths:
         '500':
           description: Verification failed (Incorrect password or missing payload).
 
+    delete:
+      summary: Delete Unlocked Paste
+      description: |
+        Delete a paste by name. This endpoint only works for pastes without password protection. 
+        If a paste is protected, this will return an error.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delete successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Verification failed (Incorrect password or missing payload).
+  
+  /api/paste/{name}/delete:
+    delete:
+      summary: Delete Unlocked Paste
+      description: |
+        Delete a paste by name. This endpoint only works for pastes without password protection. 
+        If a paste is protected, this will return an error.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delete successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Verification failed (Incorrect password or missing payload).
+
+    post:
+      summary: Delete Locked Paste
+      description: Delete a password-protected paste. The password must be provided in the request body.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordModel'
+      responses:
+        '200':
+          description: Delete successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Verification failed (Incorrect password or missing payload).
+
+
 components:
   schemas:
     # Core Model: Maps to Zig `Paste` struct

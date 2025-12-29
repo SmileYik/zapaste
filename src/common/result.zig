@@ -22,7 +22,7 @@ pub fn create(comptime T: type) type {
             };
         }
 
-        pub fn success(data: T, message: ?[]const u8) Self {
+        pub fn success(data: ?T, message: ?[]const u8) Self {
             return .{
                 .code = 200,
                 .data = data,
