@@ -4,3 +4,5 @@ zig-out/
 .git/
 README.md
 .gitignore
+.github/
+docs/
