@@ -2,7 +2,28 @@
 
 Zapaste is a Pastebin service built using Zig and the Zap web framework.
 
-## **Key Features:**
+## Content
+
+- [Zapaste](#zapaste)
+  - [Content](#content)
+  - [Key Features](#key-features)
+  - [FAQ](#faq)
+  - [Build](#build)
+    - [Manual](#manual)
+    - [Github Action](#github-action)
+  - [Usage](#usage)
+    - [Run Service](#run-service)
+      - [Run Service by Native](#run-service-by-native)
+      - [Run Server By Docker](#run-server-by-docker)
+    - [HTTP API](#http-api)
+  - [Configuration](#configuration)
+    - [All Configuration](#all-configuration)
+    - [Configuration Example](#configuration-example)
+      - [Enable Swagger](#enable-swagger)
+      - [Enable Embed Web Server](#enable-embed-web-server)
+      - [Allow CORS Request](#allow-cors-request)
+
+## Key Features
 
 - Paginated retrieval of public pastes.
 - Password-protected paste access via POST.
@@ -13,10 +34,10 @@ Zapaste is a Pastebin service built using Zig and the Zap web framework.
 
 ## FAQ
 
-+ Q: Does Zapaste work on Windows?
-    - Can not directly work on Windows, but it can work on wsl2 or a docker container.
-+ Q: Does support upload/download files?
-    - Not now, but still woring for it.
+- Q: Does Zapaste work on Windows?
+  - Can not directly work on Windows, but it can work on wsl2 or a docker container.
+- Q: Does support upload/download files?
+  - Not now, but still woring for it.
 
 ## Build
 
@@ -100,51 +121,51 @@ Example configuration file: [default configuration]
 
 ### All Configuration
 
-+ **`dao_type`**: currently only support `Sqlite`.
+- **`dao_type`**: currently only support `Sqlite`.
 
-+ **`sqlite_options`**: only enabled when `dao_type` is `Sqlite`
+- **`sqlite_options`**: only enabled when `dao_type` is `Sqlite`
 
-    + **`memory_mode`**: enable memory mode, the all data will store in memory, and will lose after shutdown service. default: `false`
+  - **`memory_mode`**: enable memory mode, the all data will store in memory, and will lose after shutdown service. default: `false`
 
-    + **`pool_size`**: sqlite pool size, if you are using `memory_mode`, it must be `1`. default `2`
+  - **`pool_size`**: sqlite pool size, if you are using `memory_mode`, it must be `1`. default `2`
 
-    + **`shared_cache`**: share cache, default `false`,
+  - **`shared_cache`**: share cache, default `false`,
 
-    + **`pragma`**: a key-value map, as same as run sql when sqlite connection be created: `SET PRAGMA KEY = VALUE`, default is `null`
+  - **`pragma`**: a key-value map, as same as run sql when sqlite connection be created: `SET PRAGMA KEY = VALUE`, default is `null`
 
-+ **`swagger`**: swagger config
+- **`swagger`**: swagger config
 
-    + **`enable`**: enable swagger or not, if you turn it on, you can access `http://yourhostname:port/swagger` to access swagger page, default `false`.
+  - **`enable`**: enable swagger or not, if you turn it on, you can access `http://yourhostname:port/swagger` to access swagger page, default `false`.
 
-    + **`swagger_config_path`**: swagger config file path (Relative path, relative to `work_dir`, if you set `/openapi.yml`, then will access file `${work_dir}/openapi.yml`), if file is not found then will return embed api config, default `/openapi.yml`.
+  - **`swagger_config_path`**: swagger config file path (Relative path, relative to `work_dir`, if you set `/openapi.yml`, then will access file `${work_dir}/openapi.yml`), if file is not found then will return embed api config, default `/openapi.yml`.
 
-    + **`swagger_index_path`**: swagger html file path, like `swagger_config_path`, default `null`
+  - **`swagger_index_path`**: swagger html file path, like `swagger_config_path`, default `null`
 
-+ **`web`**: static web config
+- **`web`**: static web config
 
-    + **`enable`**: enable static web server, default `false`
-    
-    + **`default_file`**: lookup default file when access folder url(like `/` or `/admin/`) , default `index.html`
+  - **`enable`**: enable static web server, default `false`
 
-    + **`prefix`**: static web request path prefix, default `/`
+  - **`default_file`**: lookup default file when access folder url(like `/` or `/admin/`) , default `index.html`
 
-    + **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access direcory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
+  - **`prefix`**: static web request path prefix, default `/`
 
-+ **`work_dir`**: the directory data stored. default `./`.
+  - **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access direcory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
 
-+ **`bind_port`**: bind service port, default `3000`
+- **`work_dir`**: the directory data stored. default `./`.
 
-+ **`max_clients`**: max clients, default `1000000`,
+- **`bind_port`**: bind service port, default `3000`
 
-+ **`enable_log`**: enable log, default `true`,
+- **`max_clients`**: max clients, default `1000000`,
 
-+ **`threads`**: how many threads handle http request. default `2`,
+- **`enable_log`**: enable log, default `true`,
 
-+ **`workers`**: how many workers, cannot share memory between workers. default `1`
+- **`threads`**: how many threads handle http request. default `2`,
 
-+ **`custom_headers`**: a key-value map, it's will set custom headers for every http request. default `null`
+- **`workers`**: how many workers, cannot share memory between workers. default `1`
 
-+ **`cors_headers`**: a key-value map. it's will set headers for every `OPTIONS` http requset, default `null`
+- **`custom_headers`**: a key-value map, it's will set custom headers for every http request. default `null`
+
+- **`cors_headers`**: a key-value map. it's will set headers for every `OPTIONS` http requset, default `null`
 
 ### Configuration Example
 
@@ -178,7 +199,7 @@ tree .
 1 directory, 4 files
 ```
 
-+ `./config.json` content
+- `./config.json` content
 
 ```json
 {
@@ -192,7 +213,7 @@ tree .
 }
 ```
 
-+ `./static/hello.txt` and `./static/index.html` has same content
+- `./static/hello.txt` and `./static/index.html` has same content
 
 ```text
 Hello Zapaste!
@@ -200,9 +221,9 @@ Hello Zapaste!
 
 after that, you can simple run `./zapaste config.json` in current directory, then you can access and see `Hello Zapaste!`:
 
-+ `http://your-host-name:your-port/`
-+ `http://your-host-name:your-port/`
-+ `http://your-host-name:your-port/hello.txt`
+- `http://your-host-name:your-port/`
+- `http://your-host-name:your-port/`
+- `http://your-host-name:your-port/hello.txt`
 
 #### Allow CORS Request
 
