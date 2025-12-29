@@ -7,14 +7,14 @@ on:
       - 'src/**'
       - 'resources/**'
       - 'build.*'
-      - '.github/**'
+      - '.github/workflows/zig.yml'
   pull_request:
     branches: [ "master" ]
     paths:
       - 'src/**'
       - 'resources/**'
       - 'build.*'
-      - '.github/**'
+      - '.github/workflows/zig.yml'
 
 jobs:
 
