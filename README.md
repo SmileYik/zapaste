@@ -20,6 +20,8 @@ Zapaste is a Pastebin service built using Zig and the Zap web framework.
 
 ## Build
 
+### Manual
+
 Make sure you are installed zig at first.
 
 ```shell
@@ -27,6 +29,10 @@ git clone https://github.com/SmileYik/zapaste.git
 cd zapaste
 zig build -Doptimize=ReleaseFast
 ```
+
+### Github Action
+
+You can pick one from [github action][zig action]. If file all outdate in github action, then you can clone this repository then the github action will be restart.
 
 ## Usage
 
@@ -38,11 +44,51 @@ You can simplify use `./zapaste` command to run service with [default configurat
 
 if you wanna use your custom configuration, you can use:
 
-```
+```shell
 ./zapaste /path/to/your/config.json
 ```
 
-if zapaste cannot access file `/path/to/your/config.json` then it will fallback to use [default configuration].
+If zapaste cannot access file `/path/to/your/config.json` then it will fallback to use [default configuration].
+
+#### Run Server By Docker
+
+You can also pull docker image and run it.
+
+This is a quick start example, will using default configuration to launch zapaste service.
+
+```shell
+docker pull ghcr.io/smileyik/zapaste:latest
+docker run -p 3000:3000 -it --rm smileyik/zapaste:latest
+```
+
+There is another example about load your custom configuration:
+
+```shell
+docker pull ghcr.io/smileyik/zapaste:latest
+docker run -it --rm \
+    -p 3000:3000 \
+    -v $(pwd)/config.json:/app/config.json \
+    smileyik/zapaste:latest
+```
+
+If you wanna mount data folder to your local machine, then you can modify your `config.json`:
+
+```shell
+{
+    "work_dir": "/data/",
+}
+```
+
+then launch docker container:
+
+```shell
+docker pull ghcr.io/smileyik/zapaste:latest
+docker run -it --rm \
+    -p 3000:3000 \
+    -v $(pwd)/config.json:/app/config.json \
+    -v $(pwd)/data:/data \
+    smileyik/zapaste:latest
+```
 
 ### HTTP API
 
@@ -178,3 +224,4 @@ For example, you can allow all CROS OPTIONS request by below configuration:
 
 [default configuration]: ./resources/config.json
 [swagger configuration]: ./resources/swagger/openapi.yml
+[zig action]: https://github.com/SmileYik/zapaste/actions/workflows/zig.yml
