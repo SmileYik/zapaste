@@ -26,13 +26,13 @@ pub const Options = struct {
 
     pub const JsonSwaggerOptions = struct {
         enable: ?bool = false,
-        swagger_config_path: ?[]const u8 = "openapi.yml",
+        swagger_config_path: ?[]const u8 = "/openapi.yml",
         swagger_index_path: ?[]const u8 = null,
     };
 
     pub const SwaggerOptions = struct {
         enable: ?bool = false,
-        swagger_config_path: ?[]const u8 = "openapi.yml",
+        swagger_config_path: ?[]const u8 = "/openapi.yml",
         swagger_index_path: ?[]const u8 = null,
     };
 
@@ -67,10 +67,10 @@ pub const Options = struct {
 
     pub const JsonOptions = struct {
         /// dao tyoe
-        dao_type: DaoType,
+        dao_type: ?DaoType = DaoType.Sqlite,
 
         /// work dir, where data stored
-        work_dir: ?[]const u8 = "/app",
+        work_dir: ?[]const u8 = "./",
 
         /// if your dao_type is Sqlite, then you can configure your sqlite options.
         sqlite_options: ?JsonSqliteOptions = JsonSqliteOptions {},
@@ -100,7 +100,7 @@ pub const Options = struct {
     };
 
     dao_type: DaoType,
-    work_dir: ?[]const u8 = "/app",
+    work_dir: ?[]const u8 = "./",
     sqlite: ?*SimpleSqlitePool = null,
     sqlite_options: ?SqliteOptions = .{},
     bind_port: ?u16 = 3000,
@@ -122,7 +122,7 @@ pub const Options = struct {
 
     pub fn init(gpa: Allocator, opt: JsonOptions) anyerror!Options {
         var options: Options = .{
-            .dao_type = opt.dao_type,
+            .dao_type = opt.dao_type orelse DaoType.Sqlite,
             .work_dir = opt.work_dir,
             .bind_port = opt.bind_port,
             .max_clients = opt.max_clients,
@@ -204,7 +204,7 @@ pub const Options = struct {
                 .shared_cache = sql_opt.shared_cache.?,
                 .threading_mode = .MultiThread,
             }, 
-            sql_opt.pool_size.?,
+            if(mode == .Memory) 1 else sql_opt.pool_size.?,
             sql_opt.pragma
         );
     }
