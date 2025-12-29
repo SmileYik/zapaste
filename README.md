@@ -58,7 +58,7 @@ This is a quick start example, will using default configuration to launch zapast
 
 ```shell
 docker pull ghcr.io/smileyik/zapaste:latest
-docker run -p 3000:3000 -it --rm smileyik/zapaste:latest
+docker run -p 3000:3000 -it --rm ghcr.io/smileyik/zapaste:latest
 ```
 
 There is another example about load your custom configuration:
@@ -68,7 +68,7 @@ docker pull ghcr.io/smileyik/zapaste:latest
 docker run -it --rm \
     -p 3000:3000 \
     -v $(pwd)/config.json:/app/config.json \
-    smileyik/zapaste:latest
+    ghcr.io/smileyik/zapaste:latest
 ```
 
 If you wanna mount data folder to your local machine, then you can modify your `config.json`:
@@ -87,7 +87,7 @@ docker run -it --rm \
     -p 3000:3000 \
     -v $(pwd)/config.json:/app/config.json \
     -v $(pwd)/data:/data \
-    smileyik/zapaste:latest
+    ghcr.io/smileyik/zapaste:latest
 ```
 
 ### HTTP API
