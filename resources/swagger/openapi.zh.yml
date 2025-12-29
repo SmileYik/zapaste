@@ -149,7 +149,38 @@ paths:
                 type: string
         '500':
           description: 密码验证失败, 或者没有提密码
-  
+
+    put:
+      summary: 更新现有的剪切板
+      description: |
+        通过名称更新剪切板内容。
+        如果剪切板设置了密码，必须在请求体中提供密码。
+        只读的剪切板无法被更新。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 剪切板的名称
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasteModel'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+        '404':
+          description: 未找到贴条或请求负载无效
+        '500':
+          description: 服务器错误（如密码错误或贴条只读)
+
   /api/paste/{name}/delete:
     delete:
       summary: 删除未加密粘贴板
@@ -252,6 +283,18 @@ components:
       type: object
       properties:
         password: { type: string, nullable: true }
+
+    # 更新请求模型
+    UpdatePasteModel:
+      type: object
+      properties:
+        password:
+          type: string
+          nullable: true
+          description: 如果原剪切板有密码，则需提供此字段进行校验
+        paste:
+          $ref: '#/components/schemas/Paste'
+      description: 更新请求模型
 
     # 通用响应包装：对应 common.Result.create(T)
     PasteResult:

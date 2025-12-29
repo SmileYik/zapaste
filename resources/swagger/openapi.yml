@@ -154,6 +154,36 @@ paths:
                 type: string
         '500':
           description: Verification failed (Incorrect password or missing payload).
+
+    put:
+      summary: Update Paste
+      description: |
+        Update a paste by name. if paste is read-only then it will not be updated.
+        If your paste has password, you need pass password field.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: paste name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasteModel'
+      responses:
+        '200':
+          description: Update successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasteResult'
+        '404':
+          description: Not found or no update payload
+        '500':
+          description: Wrong password or read-only
   
   /api/paste/{name}/delete:
     delete:
@@ -260,6 +290,18 @@ components:
       type: object
       properties:
         password: { type: string, nullable: true }
+
+    # Request model for update
+    UpdatePasteModel:
+      type: object
+      properties:
+        password:
+          type: string
+          nullable: true
+          description: If paste has password.
+        paste:
+          $ref: '#/components/schemas/Paste'
+      description: Update paste request model
 
     # Generic Result Wrapper: Maps to common.Result.create(T)
     PasteResult:

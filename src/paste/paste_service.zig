@@ -56,12 +56,8 @@ pub const PasteService = struct {
         entity.latest_read_at = @intCast(std.time.timestamp());
         
         const password_len = std.mem.trim(u8, entity.password orelse "", " \n\r\t").len;
-        if (password_len == 0) {
-            entity.has_password = false;
-        } else {
-            entity.has_password = true;
-            // TODO some password thing,
-        }
+        entity.has_password = password_len != 0;
+        // TODO some password thing,
 
         const retry = 3;
         for (0..retry) |i| {
@@ -144,26 +140,39 @@ pub const PasteService = struct {
         return try self.dao.?.get_paste_by_name(gpa, paste_name);
     }
 
-    pub fn update_paste(self: *Self, gpa: Allocator, paste: Paste) !?Paste {
+    pub fn update_paste(
+        self: *Self, 
+        gpa: Allocator, 
+        paste: Paste, 
+        name: []const u8, 
+        password: ?[]const u8, 
+        force_update: bool
+    ) !?Paste {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
+
         var entity = try paste.dupe(temp_gpa);
-        if (entity.id == null) {
-            var found: ?Paste = null;
-            if (entity.name) |name| {
-                if (try self.find_paste(temp_gpa, name)) |f| {
-                    found = f;
-                }
-            }
-            if (found) |f| {
-                entity.id = f.id;
-            } else {
-                return error.CannotFindPaste;
-            }
-        }
         entity.name = null;
-        return try self.dao.?.update_paste(gpa, entity);
+        if (try self.find_paste(temp_gpa, name)) |stored| {
+            if (!force_update and stored.read_only orelse false) {
+                return error.ReadOnly;
+            } else if (force_update or check_paste_passwod(&stored, password)) {
+                entity.id = stored.id;
+
+                // TODO password things
+                const password_len = std.mem.trim(
+                    u8, 
+                    entity.password orelse stored.password orelse "", 
+                    " \n\r\t"
+                ).len;
+                entity.has_password = password_len != 0;
+
+                return try self.dao.?.update_paste(gpa, entity);
+            }
+            return error.PasswordRequired;
+        }
+        return null;
     }
 
     pub fn increase_read_count(self: *Self, paste: Paste) !void {

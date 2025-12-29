@@ -13,6 +13,7 @@ pub const PasteDao = struct {
     delete_paste_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!bool,
     delete_paste_by_name_fn: *const fn (ptr: *anyopaque, name: []const u8) anyerror!bool,
     update_paste_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste,
+    update_paste_by_name_fn: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste,
     increase_read_count_fn: *const fn (ptr: *anyopaque, paste: Paste) anyerror!void,
     insert_paste_fn: *const fn (ptr: *anyopaque, entity: Paste) anyerror!?u64,
     clean_paste_fn: *const fn (ptr: *anyopaque) anyerror!void,
@@ -43,6 +44,10 @@ pub const PasteDao = struct {
 
     pub fn update_paste(self: PasteDao, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
         return try self.update_paste_fn(self.ptr, allocator, entity);
+    }
+
+    pub fn update_paste_by_name(self: PasteDao, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
+        return try self.update_paste_by_name_fn(self.ptr, allocator, entity);
     }
 
     /// increase read count. allow pass name or id. id has higer priority.
@@ -195,7 +200,6 @@ pub const SqlitePasteDao = struct {
         \\  create_at = COALESCE(:create_at, create_at),
         \\  expiration_at = COALESCE(:expiration_at, expiration_at),
         \\  profiles = COALESCE(:profiles, profiles)
-        \\WHERE id = :id
     ;
 
     pool: *SimpleSqlitePool,
@@ -211,6 +215,7 @@ pub const SqlitePasteDao = struct {
             .delete_paste_fn = delete_paste,
             .delete_paste_by_name_fn = delete_paste_by_name,
             .update_paste_fn = update_paste,
+            .update_paste_by_name_fn = update_paste_by_name,
             .increase_read_count_fn = increase_read_count,
             .insert_paste_fn = insert_paste,
             .clean_paste_fn = clean_paste
@@ -374,11 +379,26 @@ pub const SqlitePasteDao = struct {
         defer conn.release();
 
         if (entity.id) |id| {
-            var stmt = try conn.get_db().prepareDynamic(UPDATE_SQL);
+            var stmt = try conn.get_db().prepareDynamic(UPDATE_SQL ++ " WHERE id = :id ");
             defer stmt.deinit();
 
             try stmt.exec(.{}, entity);
             return try get_paste(ptr, allocator, id);
+        }
+        return entity;
+    }
+
+    fn update_paste_by_name(ptr: *anyopaque, allocator: std.mem.Allocator, entity: Paste) anyerror!?Paste {
+        const self: *SqlitePasteDao = @ptrCast(@alignCast(ptr));
+        const conn = try self.pool.get_connection();
+        defer conn.release();
+
+        if (entity.name) |name| {
+            var stmt = try conn.get_db().prepareDynamic(UPDATE_SQL ++ " WHERE COALESCE(:id, 0) IS NOT NULL AND name = :name");
+            defer stmt.deinit();
+
+            try stmt.exec(.{}, entity);
+            return try get_paste_by_name(ptr, allocator, name);
         }
         return entity;
     }

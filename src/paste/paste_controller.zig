@@ -52,6 +52,9 @@ pub fn register(
     const delete_router = try router.special(allocator, .DELETE);
     try delete_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &delete_unlock_paste);
     try delete_router.handle_var_func_bound(allocator, prefix_path ++ "/:name/delete", self, &delete_unlock_paste);
+
+    const put_router = try router.special(allocator, .PUT);
+    try put_router.handle_var_func_bound(allocator, prefix_path ++ "/:name", self, &update_paste);
 }
 
 const PastePageResult = common.Result.create(Paste.Page);
@@ -60,6 +63,11 @@ const PasteResult = common.Result.create(Paste);
 
 const PasswordModel = struct {
     password: ?[]const u8 = null
+};
+
+const UpdatePasteModel = struct {
+    password: ?[]const u8 = null,
+    paste: ?Paste = null
 };
 
 const result_name_cannot_empty = PasteResult.init(500, null, "Paste name cannot be empty.");
@@ -318,4 +326,60 @@ inline fn handle_delete_request(
         }
     };
     PasteResult.success(null, "deleted").send_json(req, strip_null_field);
+}
+
+/// update paste with password, `password` field is options
+/// 
+/// PUT /:name
+/// 
+/// content-type: application/json
+/// 
+/// + body: `UpdatePasteModel`
+fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
+    const not_update_message = comptime PasteResult.init(404, null, "Not found paste or not have update payload.");
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    if (req.body) |body| {
+        const parsed = try std.json.parseFromSlice(
+            UpdatePasteModel, 
+            allocator, 
+            body, 
+            .{ .ignore_unknown_fields = true }
+        );
+        defer parsed.deinit();
+        const update_model: UpdatePasteModel = parsed.value;
+        if (update_model.paste) |p| {
+            const name = path_variables.get("name").?;
+            var paste = p;
+            paste.read_count = null;
+            paste.create_at = null;
+            paste.latest_read_at = null;
+            const updated = self.service.?.update_paste(allocator, paste, name, update_model.password, false)
+            catch |err| switch (err) {
+                error.PasswordRequired => {
+                    result_no_password.send_json(req, strip_null_field);
+                    return;
+                },
+                error.ReadOnly => {
+                    PasteResult.failed_message("This paste is read-only!").send_json(req, strip_null_field);
+                    return;
+                },
+                else => |e| {
+                    const result = try PasteResult.failed(allocator, e, "failed to delete");
+                    result.send_json(req, strip_null_field);
+                    return;
+                }
+            };
+            if (updated) |u| {
+                var e = u;
+                e.password = null;
+                PasteResult.success(e, "Updated").send_json(req, strip_null_field);
+            }
+        }
+    }
+    not_update_message.send_json(req, strip_null_field);
 }

@@ -30,6 +30,10 @@ pub fn create(comptime T: type) type {
             };
         }
 
+        pub fn failed_message(msg: ?[]const u8) Self {
+            return init(500, null, msg);
+        }
+
         pub fn failed(allocator: Allocator, err: ?anyerror, msg: ?[]const u8) !Self {
             const final_msg = if (err) |e| blk: {
                 break :blk try std.fmt.allocPrint(allocator, "{s}: {s}", .{ @errorName(e), msg orelse "" });
