@@ -65,12 +65,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .openssl = false,
     });
+    zap.artifact("facil.io").linkage = .static;
 
     // zig-sqllite dependency
     const sqlite = b.dependency("sqlite", .{
         .target = target,
         .optimize = optimize,
     });
+    sqlite.artifact("sqlite").linkage = .static;
 
     common_mod.addImport("sqlite", sqlite.module("sqlite"));
     common_mod.addImport("zap", zap.module("zap"));
@@ -124,10 +126,11 @@ pub fn build(b: *std.Build) void {
                 // repeated because you are allowed to rename your imports, which
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
-                .{ .name = "zapaste", .module = mod }
+                .{ .name = "zapaste", .module = mod },
+                .{ .name = "zap", .module = zap.module("zap") },
             },
         }),
-        .use_llvm = true
+        .use_llvm = true,
     });
 
     // This declares intent for the executable to be installed into the
@@ -206,8 +209,4 @@ pub fn build(b: *std.Build) void {
     //
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
-
-    exe.root_module.addImport("zap", zap.module("zap"));
-    exe.root_module.addImport("sqlite", sqlite.module("sqlite"));
-    
 }

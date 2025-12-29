@@ -18,7 +18,7 @@ pub fn get_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common.
     std.debug.print(
         \\
         \\Loading config:
-        \\ {f}
+        \\{f}
         \\
         \\
         , 
