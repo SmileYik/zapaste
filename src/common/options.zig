@@ -10,6 +10,19 @@ pub const DaoType = enum {
 };
 
 pub const Options = struct {
+    pub const JsonWebOptions = struct {
+        enable: ?bool = false,
+        default_file: ?[]const u8 = null,
+        prefix: ?[]const u8 = null,
+        static_path: ?[]const u8 = null,
+    };
+
+    pub const WebOptions = struct {
+        enable: bool = false,
+        default_file: []const u8 = "",
+        prefix: []const u8 = "",
+        static_path: []const u8 = "",
+    };
 
     pub const JsonSwaggerOptions = struct {
         enable: ?bool = false,
@@ -83,6 +96,7 @@ pub const Options = struct {
         // cors headers will set to OPTIONS requests only
         cors_headers: ?std.json.Value = null,
         swagger: ?JsonSwaggerOptions = JsonSwaggerOptions {},
+        web: ?JsonWebOptions = JsonWebOptions {},
     };
 
     dao_type: DaoType,
@@ -97,6 +111,7 @@ pub const Options = struct {
     custom_headers: ?StringHashMap = null,
     cors_headers: ?StringHashMap = null,
     swagger: ?SwaggerOptions = SwaggerOptions {},
+    web: ?WebOptions = WebOptions {},
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -132,6 +147,7 @@ pub const Options = struct {
         options.sqlite_options.?.pool_size = opt.sqlite_options.?.pool_size orelse default_sqlite_opt.pool_size;
         options.sqlite_options.?.shared_cache = opt.sqlite_options.?.shared_cache orelse default_sqlite_opt.shared_cache;
         options.sqlite_options.?.pragma = try json_obj_to_string_map(gpa,opt.sqlite_options.?.pragma);
+        options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
 
         if (opt.swagger) |s| {
             options.swagger.?.enable = s.enable;
@@ -143,7 +159,20 @@ pub const Options = struct {
             }
         }
 
-        options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
+        if (opt.web) |web| {
+            var conf = &options.web.?;
+            conf.enable = web.enable orelse false;
+            if (web.default_file) |s| {
+                conf.default_file = try dupe_str(s, "index.html", gpa);
+            }
+            if (web.prefix) |s| {
+                conf.prefix = try dupe_str(s, "/", gpa);
+            }
+            if (web.static_path) |s| {
+                conf.static_path = try dupe_str(s, "static", gpa);
+            }
+        }
+
         if (options.dao_type == DaoType.Sqlite) {
             try init_sqlite(gpa, &options);
         }

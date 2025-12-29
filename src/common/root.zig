@@ -13,3 +13,5 @@ pub const RouterError = variable_router.RouterError;
 pub const VariableRouter = variable_router.VariableRouter;
 pub const WrapperRouter = variable_router.WrapperRouter;
 pub const RouterOptions = variable_router.RouterOptions;
+
+pub const StaticController = @import("static_controller.zig");

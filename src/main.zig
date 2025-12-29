@@ -72,6 +72,7 @@ pub fn main() !void {
     };
     defer router.deinit();
 
+    try zapaste.common.StaticController.init(allocator, router, &options);
     const swagger_controller = try zapaste.swagger.SwaggerController.init(
         allocator, router, "/swagger", &options
     );
