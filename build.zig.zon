@@ -33,11 +33,11 @@
     // internet connectivity.
     .dependencies = .{
         .zap = .{
-            .url = "git+https://gh-proxy.org/https://github.com/zigzap/zap?ref=v0.11.0#66c5dc42c781bbb8a9100afda3c7e69ee96eddf3",
+            .url = "git+https://github.com/zigzap/zap?ref=v0.11.0#66c5dc42c781bbb8a9100afda3c7e69ee96eddf3",
             .hash = "zap-0.10.6-GoeB8xCEJABLgoiZjWZMMT5TsoZ5OO2EZe6j24RTUYEH",
         },
         .sqlite = .{
-            .url = "git+https://gh-proxy.org/https://github.com/vrischmann/zig-sqlite?ref=zig-0.15.1#c1a5f2720bad283f870df77b41430bd461bb9182",
+            .url = "git+https://github.com/vrischmann/zig-sqlite?ref=zig-0.15.1#c1a5f2720bad283f870df77b41430bd461bb9182",
             .hash = "sqlite-3.48.0-F2R_a9eODgDPCO5CDptJHZINZSIn48IFVIWUhuxxwGTb",
         },
     },
