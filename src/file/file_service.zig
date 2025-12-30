@@ -62,9 +62,8 @@ inline fn get_file_path(self: *Self, allocator: Allocator, filename: []const u8)
 inline fn file_hash(allocator: Allocator, bytes: []const u8) ![]const u8 {
     var hash: [64]u8 = undefined;
     std.crypto.hash.sha2.Sha512.hash(bytes, &hash, .{});
-    const chars = std.fmt.bytesToHex(hash, .upper);
     return std.fmt.allocPrint(allocator, "{s}", .{
-        chars
+        std.fmt.bytesToHex(hash, .upper)
     });
 }
 // std.crypto.hash.sha2.Sha512

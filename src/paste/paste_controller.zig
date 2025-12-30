@@ -311,50 +311,35 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         return;
     }
 
-    var paste_json: ?[] const u8 = null;
     var attachements: ?[]const u8 = null;
-    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) {
-        paste_json = req.body;
-    } else {
+    const paste_json: ?[] const u8, 
+    const req_body: ?zap.Request.HttpParamKVList, 
+    const file_param: ?zap.Request.HttpParam = 
+    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) .{ req.body, null, null }
+    else blk: {
         try req.parseBody();
         const body = try req.parametersToOwnedList(allocator);
-        // defer body.deinit();
-        var file_array: [32]u64 = undefined;
-        var file_list = std.ArrayList(u64).initBuffer(&file_array);
 
+        var json: ?[] const u8 = null;
+        var file_p: ?zap.Request.HttpParam = null;
         for (body.items) |item| {
             if (std.mem.eql(u8, item.key, "paste")) {
                 if (item.value) |value| switch (value) {
-                    .String => |s| paste_json = s,
+                    .String => |s| json = s,
                     else => continue
                 };
             } else if (std.mem.eql(u8, item.key, "file")) {
-                if (item.value) |value| switch (value) {
-                    .Hash_Binfile => |f| {
-                        if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
-                            try file_list.append(allocator, id);
-                        }
-                    },
-                    .Array_Binfile => |list| {
-                        for (list.items) |f| if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
-                            try file_list.append(allocator, id);
-                        };
-                    },
-                    else => continue
-                };
+                file_p = item.value;
             }
         }
+        break :blk .{ json, body, file_p };
+    };
+    defer if (req_body) |body| {
+        var b = body;
+        b.deinit();
+    };
 
-        var ids = try std.ArrayList(u8).initCapacity(allocator, 1024);
-        if (file_list.items.len > 0) {
-            for (file_list.items) |id| {
-                try ids.append(allocator, ',');
-                try std.fmt.format(ids.writer(allocator), "{d}", .{ id });
-            }
-            attachements = ids.items[1..];
-        }
-    }
-
+    // json first
     if (paste_json == null) {
         no_valid_payload.send_json(req, strip_null_field);
         return;
@@ -364,6 +349,37 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         .allocate = .alloc_always,
     });
     defer parsed.deinit();
+
+    // file after
+    var file_array: [32]u64 = undefined;
+    var file_list = std.ArrayList(u64).initBuffer(&file_array);
+    defer file_list.deinit(allocator);
+    if (file_param) |*value| switch (value.*) {
+        .Hash_Binfile => |f| {
+            if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
+                try file_list.append(allocator, id);
+            }
+        },
+        .Array_Binfile => |*list| {
+            var flist = list.*;
+            for (list.items) |f| if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
+                try file_list.append(allocator, id);
+            };
+            flist.deinit(allocator);
+        },
+        else => {}
+    };
+    var ids = try std.ArrayList(u8).initCapacity(allocator, 1024);
+    defer ids.deinit(allocator);
+    if (file_list.items.len > 0) {
+        for (file_list.items) |id| {
+            try ids.append(allocator, ',');
+            try std.fmt.format(ids.writer(allocator), "{d}", .{ id });
+        }
+        attachements = ids.items[1..];
+    }
+
+    // save records
     var entity: Paste = parsed.value;
     entity.attachements = attachements;
     const result = if (self.service.?.create_paste(allocator, entity)) |inserted| blk: {
