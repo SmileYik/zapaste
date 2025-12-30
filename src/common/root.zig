@@ -15,3 +15,5 @@ pub const WrapperRouter = variable_router.WrapperRouter;
 pub const RouterOptions = variable_router.RouterOptions;
 
 pub const StaticController = @import("static_controller.zig");
+
+pub const ZapParamsFinder = @import("zap_params_finder.zig");
