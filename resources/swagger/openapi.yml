@@ -173,6 +173,15 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdatePasteModel'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                paste:
+                  type: string
+                  description: JSON serialized string of a Paste object.
+              required:
+                - paste
       responses:
         '200':
           description: Update successful

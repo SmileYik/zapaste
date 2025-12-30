@@ -199,67 +199,6 @@ fn list_public_pastes(self: *Self, req: zap.Request) !void {
     result.?.send_json(req, strip_null_field);
 }
 
-/// create paste, you can special any field but `id`.
-/// 
-/// POST /
-/// 
-/// content-type: application/form-date
-/// 
-/// params: `paste={JSON}`, `{JSON}` is `Paste` type. 
-/// 
-fn create_paste(self: *Self, req: zap.Request) !void {
-    const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
-    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
-
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    if (req.body == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
-    }
-    const content_type = req.getHeaderCommon(.content_type);
-    if (content_type == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
-    }
-
-    var paste_json: ?[] const u8 = null;
-    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) {
-        paste_json = req.body;
-    } else {
-        try req.parseBody();
-        const body = try req.parametersToOwnedList(allocator);
-        for (body.items) |item| {
-            if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
-                switch (item.value.?) {
-                    .String => |s| paste_json = s,
-                    else => continue
-                }
-                break;
-            }
-        }
-    }
-
-    if (paste_json == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
-    }
-    const parsed = try std.json.parseFromSlice(Paste, allocator, paste_json.?, .{
-        .ignore_unknown_fields = true,
-        .allocate = .alloc_always,
-    });
-    defer parsed.deinit();
-    const result = if (self.service.?.create_paste(allocator, parsed.value)) |inserted| blk: {
-        break :blk PasteResult.success(inserted, "success");
-    } else |e| blk: {
-        break :blk try PasteResult.failed(allocator, e, "failed to create");
-    };
-
-    result.send_json(req, strip_null_field);
-}
-
 /// delete unlock paste by name
 /// 
 /// DELETE /:name/delete
@@ -328,6 +267,67 @@ inline fn handle_delete_request(
     PasteResult.success(null, "deleted").send_json(req, strip_null_field);
 }
 
+/// create paste, you can special any field but `id`.
+/// 
+/// POST /
+/// 
+/// content-type: application/form-date
+/// 
+/// params: `paste={JSON}`, `{JSON}` is `Paste` type. 
+/// 
+fn create_paste(self: *Self, req: zap.Request) !void {
+    const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
+    errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    if (req.body == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+    const content_type = req.getHeaderCommon(.content_type);
+    if (content_type == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+
+    var paste_json: ?[] const u8 = null;
+    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) {
+        paste_json = req.body;
+    } else {
+        try req.parseBody();
+        const body = try req.parametersToOwnedList(allocator);
+        for (body.items) |item| {
+            if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
+                switch (item.value.?) {
+                    .String => |s| paste_json = s,
+                    else => continue
+                }
+                break;
+            }
+        }
+    }
+
+    if (paste_json == null) {
+        no_valid_payload.send_json(req, strip_null_field);
+        return;
+    }
+    const parsed = try std.json.parseFromSlice(Paste, allocator, paste_json.?, .{
+        .ignore_unknown_fields = true,
+        .allocate = .alloc_always,
+    });
+    defer parsed.deinit();
+    const result = if (self.service.?.create_paste(allocator, parsed.value)) |inserted| blk: {
+        break :blk PasteResult.success(inserted, "success");
+    } else |e| blk: {
+        break :blk try PasteResult.failed(allocator, e, "failed to create");
+    };
+
+    result.send_json(req, strip_null_field);
+}
+
 /// update paste with password, `password` field is options
 /// 
 /// PUT /:name
@@ -343,11 +343,31 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    if (req.body) |body| {
+    const content_type = req.getHeaderCommon(.content_type);
+    var paste_json: ?[] const u8 = null;
+    if (content_type) |ctype| {
+        if (std.ascii.eqlIgnoreCase("application/json", ctype)) {
+            paste_json = req.body;
+        } else {
+            try req.parseBody();
+            const body = try req.parametersToOwnedList(allocator);
+            for (body.items) |item| {
+                if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
+                    switch (item.value.?) {
+                        .String => |s| paste_json = s,
+                        else => continue
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    if (paste_json) |josn| {
         const parsed = try std.json.parseFromSlice(
             UpdatePasteModel, 
             allocator, 
-            body, 
+            josn, 
             .{ .ignore_unknown_fields = true }
         );
         defer parsed.deinit();
@@ -381,5 +401,6 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
             }
         }
     }
+
     not_update_message.send_json(req, strip_null_field);
 }
