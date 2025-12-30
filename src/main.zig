@@ -81,7 +81,7 @@ pub fn main() !void {
         zapaste.swagger.SwaggerController.info(options.bind_port.?);
     }
 
-    const paste_controller = PasteController.init(allocator, options)
+    const paste_controller = PasteController.init(allocator, &options)
     catch |e| {
         std.debug.print("PasteController initialize failed: {}", .{e});
         return;

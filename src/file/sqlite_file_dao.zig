@@ -48,7 +48,7 @@ const DELETE_SQL =
 
 pool: *SimpleSqlitePool,
 
-fn init(self: *Self) FileDao {
+pub fn init(self: *Self) FileDao {
     return .{
         .ptr = self,
         .create_table_if_not_exists_fn = create_table_if_not_exists,

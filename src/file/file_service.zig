@@ -35,12 +35,16 @@ pub fn save_file(
         const store_path = self.get_file_path(temp_a, hash) catch {
             return FileError.StoreFailed;
         };
+        const parent_path = store_path[0..store_path.len - hash.len];
+        std.fs.cwd().makePath(parent_path) catch {
+            return FileError.StoreFailed;
+        };
         std.fs.cwd().writeFile(.{ .data = bytes, .sub_path = store_path }) catch {
             return FileError.StoreFailed;
         };
         return self.dao.insert_file(.{
             .filename = filename,
-            .filesize = bytes.len,
+            .filesize = @intCast(bytes.len),
             .filepath = null,
             .hash = hash,
             .mimetype = mimetype
@@ -58,8 +62,9 @@ inline fn get_file_path(self: *Self, allocator: Allocator, filename: []const u8)
 inline fn file_hash(allocator: Allocator, bytes: []const u8) ![]const u8 {
     var hash: [64]u8 = undefined;
     std.crypto.hash.sha2.Sha512.hash(bytes, &hash, .{});
+    const chars = std.fmt.bytesToHex(hash, .upper);
     return std.fmt.allocPrint(allocator, "{s}", .{
-        std.fmt.bytesToHex(bytes, .upper)
+        chars
     });
 }
 // std.crypto.hash.sha2.Sha512

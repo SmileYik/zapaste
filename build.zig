@@ -91,6 +91,7 @@ pub fn build(b: *std.Build) void {
     paste_mod.addImport("zap", zap.module("zap"));
     paste_mod.addImport("common", common_mod);
     paste_mod.addImport("res", res_mod);
+    paste_mod.addImport("file", file_mod);
     
     file_mod.addImport("common", common_mod);
 

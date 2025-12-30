@@ -6,6 +6,8 @@ const PasteDao = @import("paste_dao.zig").PasteDao;
 const SqlitePasteDao = @import("paste_dao.zig").SqlitePasteDao;
 const PasteService = @import("paste_service.zig").PasteService;
 
+const file = @import("file");
+
 const WrapperRouter = common.WrapperRouter;
 
 const Allocator = std.mem.Allocator;
@@ -13,22 +15,36 @@ const Allocator = std.mem.Allocator;
 pub const Self = @This();
 
 service: ?PasteService = undefined,
+file_service: ?file.FileService = undefined,
 
-pub fn init(allocator: Allocator, options: common.Options) !*Self {
+pub fn init(allocator: Allocator, options: *common.Options) !*Self {
     var self: *Self = try allocator.create(Self);
     self.* = .{
         .service = undefined,
     };
     switch (options.dao_type) {
         .Sqlite => |_| {
-            var sqldao: *SqlitePasteDao = try allocator.create(SqlitePasteDao);
-            sqldao.* = .{ .pool = options.sqlite.? };
-            const dao = try allocator.create(PasteDao);
-            dao.* = sqldao.create();
-            try dao.create_table_if_not_exists();
-            self.service = PasteService.create(.{
-                .dao = dao
-            });
+            {
+                var sqldao: *SqlitePasteDao = try allocator.create(SqlitePasteDao);
+                sqldao.* = .{ .pool = options.sqlite.? };
+                const dao = try allocator.create(PasteDao);
+                dao.* = sqldao.create();
+                try dao.create_table_if_not_exists();
+                self.service = PasteService.create(.{
+                    .dao = dao
+                });
+            }
+            {
+                var sqldao: *file.SqliteFileDao = try allocator.create(file.SqliteFileDao);
+                sqldao.* = .{ .pool = options.sqlite.? };
+                const dao = try allocator.create(file.FileDao);
+                dao.* = sqldao.init();
+                try dao.create_table_if_not_exists();
+                self.file_service = file.FileService {
+                    .dao = dao,
+                    .store_path = options.get_path(allocator, "uploads", "./uploads")
+                };
+            }
         },
     }
     return self;
@@ -278,11 +294,13 @@ inline fn handle_delete_request(
 fn create_paste(self: *Self, req: zap.Request) !void {
     const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
+    errdefer if (@errorReturnTrace()) |trace| {
+        std.debug.dumpStackTrace(trace.*);
+    };
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-
     if (req.body == null) {
         no_valid_payload.send_json(req, strip_null_field);
         return;
@@ -294,19 +312,46 @@ fn create_paste(self: *Self, req: zap.Request) !void {
     }
 
     var paste_json: ?[] const u8 = null;
+    var attachements: ?[]const u8 = null;
     if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) {
         paste_json = req.body;
     } else {
         try req.parseBody();
         const body = try req.parametersToOwnedList(allocator);
+        // defer body.deinit();
+        var file_array: [32]u64 = undefined;
+        var file_list = std.ArrayList(u64).initBuffer(&file_array);
+
         for (body.items) |item| {
-            if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
-                switch (item.value.?) {
+            if (std.mem.eql(u8, item.key, "paste")) {
+                if (item.value) |value| switch (value) {
                     .String => |s| paste_json = s,
                     else => continue
-                }
-                break;
+                };
+            } else if (std.mem.eql(u8, item.key, "file")) {
+                if (item.value) |value| switch (value) {
+                    .Hash_Binfile => |f| {
+                        if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
+                            try file_list.append(allocator, id);
+                        }
+                    },
+                    .Array_Binfile => |list| {
+                        for (list.items) |f| if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
+                            try file_list.append(allocator, id);
+                        };
+                    },
+                    else => continue
+                };
             }
+        }
+
+        var ids = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        if (file_list.items.len > 0) {
+            for (file_list.items) |id| {
+                try ids.append(allocator, ',');
+                try std.fmt.format(ids.writer(allocator), "{d}", .{ id });
+            }
+            attachements = ids.items[1..];
         }
     }
 
@@ -319,7 +364,9 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         .allocate = .alloc_always,
     });
     defer parsed.deinit();
-    const result = if (self.service.?.create_paste(allocator, parsed.value)) |inserted| blk: {
+    var entity: Paste = parsed.value;
+    entity.attachements = attachements;
+    const result = if (self.service.?.create_paste(allocator, entity)) |inserted| blk: {
         break :blk PasteResult.success(inserted, "success");
     } else |e| blk: {
         break :blk try PasteResult.failed(allocator, e, "failed to create");
