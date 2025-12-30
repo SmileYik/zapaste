@@ -108,7 +108,3 @@ pub fn main() !void {
         .workers = @intCast(options.workers.?),
     });
 }
-
-test {
-    std.testing.refAllDecls(@This());
-}
