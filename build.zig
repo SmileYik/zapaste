@@ -57,6 +57,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
+    const file_mod = b.addModule("file", .{
+        .root_source_file = b.path("src/file/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
     const swagger_mod = b.addModule("swagger", .{
         .root_source_file = b.path("src/swagger/root.zig"),
         .target = target,
@@ -85,6 +91,8 @@ pub fn build(b: *std.Build) void {
     paste_mod.addImport("zap", zap.module("zap"));
     paste_mod.addImport("common", common_mod);
     paste_mod.addImport("res", res_mod);
+    
+    file_mod.addImport("common", common_mod);
 
     swagger_mod.addImport("common", common_mod);
     swagger_mod.addImport("zap", zap.module("zap"));
@@ -95,6 +103,7 @@ pub fn build(b: *std.Build) void {
     mod.addImport("paste", paste_mod);
     mod.addImport("swagger", swagger_mod);
     mod.addImport("res", res_mod);
+    mod.addImport("file", file_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -197,6 +206,11 @@ pub fn build(b: *std.Build) void {
     });
     const run_paste_tests = b.addRunArtifact(paste_tests);
 
+    const file_tests = b.addTest(.{
+        .root_module = file_mod
+    });
+    const run_file_tests = b.addRunArtifact(file_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -204,6 +218,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
     test_step.dependOn(&run_paste_tests.step);
+    test_step.dependOn(&run_file_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
