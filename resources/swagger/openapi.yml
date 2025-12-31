@@ -60,7 +60,7 @@ paths:
                   type: array
                   items:
                     type: string
-                    format: binary # 如果是真正上传文件，这里用 binary
+                    format: binary
                   description: Multiple files to upload.
               required:
                 - paste
@@ -179,13 +179,19 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdatePasteModel'
-          application/x-www-form-urlencoded:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 paste:
                   type: string
-                  description: JSON serialized string of a Paste object.
+                  description: JSON serialized string of a UpdatePasteModel object.
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Multiple files to upload.
               required:
                 - paste
       responses:

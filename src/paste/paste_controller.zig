@@ -292,7 +292,6 @@ inline fn handle_delete_request(
 /// params: `paste={JSON}`, `{JSON}` is `Paste` type. 
 /// 
 fn create_paste(self: *Self, req: zap.Request) !void {
-    const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
     errdefer if (@errorReturnTrace()) |trace| {
         std.debug.dumpStackTrace(trace.*);
@@ -301,94 +300,31 @@ fn create_paste(self: *Self, req: zap.Request) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    if (req.body == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
-    }
-    const content_type = req.getHeaderCommon(.content_type);
-    if (content_type == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
-    }
 
-    var attachements: ?[]const u8 = null;
-    const paste_json: ?[] const u8, 
-    const req_body: ?zap.Request.HttpParamKVList, 
-    const file_param: ?zap.Request.HttpParam = 
-    if (std.ascii.eqlIgnoreCase("application/json", content_type.?)) .{ req.body, null, null }
-    else blk: {
-        try req.parseBody();
-        const body = try req.parametersToOwnedList(allocator);
+    const parsed, const ids = try handle_receive_paste(self, allocator, req, Paste);
+    defer if (ids) |list| {
+        var l = list;
+        l.deinit(allocator);
+    };
 
-        var json: ?[] const u8 = null;
-        var file_p: ?zap.Request.HttpParam = null;
-        for (body.items) |item| {
-            if (std.mem.eql(u8, item.key, "paste")) {
-                if (item.value) |value| switch (value) {
-                    .String => |s| json = s,
-                    else => continue
-                };
-            } else if (std.mem.eql(u8, item.key, "file")) {
-                file_p = item.value;
-            }
+    if (parsed) |*parsed_entity| {
+        var var_parsed = parsed_entity;
+        var_parsed.deinit();
+
+        if (req.isFinished()) return;
+
+        var entity: Paste = var_parsed.value;
+        if (ids) |list| {
+            if (list.items.len > 0) entity.attachements = list.items[1..];
         }
-        break :blk .{ json, body, file_p };
-    };
-    defer if (req_body) |body| {
-        var b = body;
-        b.deinit();
-    };
+        const result = if (self.service.?.create_paste(allocator, entity)) |inserted| blk: {
+            break :blk PasteResult.success(inserted, "success");
+        } else |e| blk: {
+            break :blk try PasteResult.failed(allocator, e, "failed to create");
+        };
 
-    // json first
-    if (paste_json == null) {
-        no_valid_payload.send_json(req, strip_null_field);
-        return;
+        result.send_json(req, strip_null_field);
     }
-    const parsed = try std.json.parseFromSlice(Paste, allocator, paste_json.?, .{
-        .ignore_unknown_fields = true,
-        .allocate = .alloc_always,
-    });
-    defer parsed.deinit();
-
-    // file after
-    var file_array: [32]u64 = undefined;
-    var file_list = std.ArrayList(u64).initBuffer(&file_array);
-    defer file_list.deinit(allocator);
-    if (file_param) |*value| switch (value.*) {
-        .Hash_Binfile => |f| {
-            if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
-                try file_list.append(allocator, id);
-            }
-        },
-        .Array_Binfile => |*list| {
-            var flist = list.*;
-            for (list.items) |f| if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
-                try file_list.append(allocator, id);
-            };
-            flist.deinit(allocator);
-        },
-        else => {}
-    };
-    var ids = try std.ArrayList(u8).initCapacity(allocator, 1024);
-    defer ids.deinit(allocator);
-    if (file_list.items.len > 0) {
-        for (file_list.items) |id| {
-            try ids.append(allocator, ',');
-            try std.fmt.format(ids.writer(allocator), "{d}", .{ id });
-        }
-        attachements = ids.items[1..];
-    }
-
-    // save records
-    var entity: Paste = parsed.value;
-    entity.attachements = attachements;
-    const result = if (self.service.?.create_paste(allocator, entity)) |inserted| blk: {
-        break :blk PasteResult.success(inserted, "success");
-    } else |e| blk: {
-        break :blk try PasteResult.failed(allocator, e, "failed to create");
-    };
-
-    result.send_json(req, strip_null_field);
 }
 
 /// update paste with password, `password` field is options
@@ -406,42 +342,27 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const content_type = req.getHeaderCommon(.content_type);
-    var paste_json: ?[] const u8 = null;
-    if (content_type) |ctype| {
-        if (std.ascii.eqlIgnoreCase("application/json", ctype)) {
-            paste_json = req.body;
-        } else {
-            try req.parseBody();
-            const body = try req.parametersToOwnedList(allocator);
-            for (body.items) |item| {
-                if (std.mem.eql(u8, item.key, "paste") and item.value != null) {
-                    switch (item.value.?) {
-                        .String => |s| paste_json = s,
-                        else => continue
-                    }
-                    break;
-                }
-            }
-        }
-    }
+    const parsed, const ids = try handle_receive_paste(self, allocator, req, UpdatePasteModel);
+    if (parsed) |update_model| {
+        var var_parsed = update_model;
+        var_parsed.deinit();
 
-    if (paste_json) |josn| {
-        const parsed = try std.json.parseFromSlice(
-            UpdatePasteModel, 
-            allocator, 
-            josn, 
-            .{ .ignore_unknown_fields = true }
-        );
-        defer parsed.deinit();
-        const update_model: UpdatePasteModel = parsed.value;
-        if (update_model.paste) |p| {
-            const name = path_variables.get("name").?;
-            var paste = p;
+        if (req.isFinished()) return;
+
+        const model = var_parsed.value;
+        const paste_if = model.paste;
+        if (paste_if) |paste_const| {
+            var paste = paste_const;
             paste.read_count = null;
             paste.create_at = null;
             paste.latest_read_at = null;
-            const updated = self.service.?.update_paste(allocator, paste, name, update_model.password, false)
+
+            if (ids) |list| {
+                if (list.items.len > 0) paste.attachements = list.items[1..];
+            }
+            
+            const name = path_variables.get("name").?;
+            const updated = self.service.?.update_paste(allocator, paste, name, model.password, false)
             catch |err| switch (err) {
                 error.PasswordRequired => {
                     result_no_password.send_json(req, strip_null_field);
@@ -461,9 +382,70 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
                 var e = u;
                 e.password = null;
                 PasteResult.success(e, "Updated").send_json(req, strip_null_field);
+                return;
             }
         }
+        not_update_message.send_json(req, strip_null_field);
+    }
+}
+
+inline fn handle_receive_paste(self: *Self, allocator: Allocator, req: zap.Request, comptime T: type) !struct {
+    ?std.json.Parsed(T), ?std.ArrayList(u8)
+} {
+    const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
+
+    if (req.body == null) {
+        result_no_password.send_json(req, strip_null_field);
+        return .{ null, null };
     }
 
-    not_update_message.send_json(req, strip_null_field);
+    const content_type = req.getHeaderCommon(.content_type);
+    if (content_type) |ct| {
+        const paste_json: ?[] const u8 = 
+        if (std.ascii.eqlIgnoreCase("application/json", ct)) req.body
+        else blk: {
+            try req.parseBody();
+            break :blk try common.ZapParamsFinder.get_string(allocator, req, "paste");
+        };
+
+        // json first
+        if (paste_json == null) {
+            no_valid_payload.send_json(req, strip_null_field);
+            return .{ null, null };
+        }
+        const parsed = try std.json.parseFromSlice(T, allocator, paste_json.?, .{
+            .ignore_unknown_fields = true,
+            .allocate = .alloc_always,
+        });
+
+        // file after
+        var file_array: [32]u64 = undefined;
+        var file_list = std.ArrayList(u64).initBuffer(&file_array);
+        defer file_list.deinit(allocator);
+        const file_len = common.ZapParamsFinder.get_file_count(allocator, req, "file") catch |e| switch (e) {
+            error.Unsupported => 0,
+            else => {
+                (try PasteResult.failed(allocator, e, "Failed to get files.")).send_json(req, strip_null_field);
+                return .{ null, null };
+            }
+        };
+        if (file_len) |len| for (0..len) |i| {
+            const param_file = try common.ZapParamsFinder.get_file(allocator, req, "file", len, i);
+            if (param_file) |f| {
+                if (try self.file_service.?.save_file(f.data, f.mimetype, f.filename)) |id| {
+                    try file_list.append(allocator, id);
+                }
+            }
+        };
+        var ids = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        // defer ids.deinit(allocator);
+        if (file_list.items.len > 0) {
+            for (file_list.items) |id| {
+                try ids.append(allocator, ',');
+                try std.fmt.format(ids.writer(allocator), "{d}", .{ id });
+            }
+        }
+        return .{ parsed, ids };
+    }
+    return .{ null, null }; 
 }
