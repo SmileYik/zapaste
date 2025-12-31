@@ -60,6 +60,15 @@ pub fn main() !void {
     };
     defer options.deinit();
 
+    if (!(zapaste.paste.init_paste(allocator, &options) catch |e| b: {
+        std.debug.print("Failed initlization paste module: {}", .{e});
+        break :b false;
+    })) return;
+    if (!(zapaste.file.init_file(allocator, &options) catch |e| b: {
+        std.debug.print("Failed initlization file module: {}", .{e});
+        break :b false;
+    })) return;
+
     var router: *WrapperRouter = WrapperRouter.init(allocator, .{
         .not_found = on_not_found,
         .interceptors = &[_]zap.HttpRequestFn {
@@ -81,8 +90,11 @@ pub fn main() !void {
         zapaste.swagger.SwaggerController.info(options.bind_port.?);
     }
 
-    const paste_controller = PasteController.init(allocator, &options)
-    catch |e| {
+    const paste_controller = PasteController.init(
+        allocator, 
+        zapaste.paste.get_paste_service().?, 
+        zapaste.file.get_file_service().?
+    ) catch |e| {
         std.debug.print("PasteController initialize failed: {}", .{e});
         return;
     };

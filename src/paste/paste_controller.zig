@@ -14,39 +14,15 @@ const Allocator = std.mem.Allocator;
 
 pub const Self = @This();
 
-service: ?PasteService = undefined,
-file_service: ?file.FileService = undefined,
+service: ?*PasteService = undefined,
+file_service: ?*file.FileService = undefined,
 
-pub fn init(allocator: Allocator, options: *common.Options) !*Self {
-    var self: *Self = try allocator.create(Self);
+pub fn init(allocator: Allocator, paste_service: *PasteService, file_service: *file.FileService) !*Self {
+    const self: *Self = try allocator.create(Self);
     self.* = .{
-        .service = undefined,
+        .service = paste_service,
+        .file_service = file_service
     };
-    switch (options.dao_type) {
-        .Sqlite => |_| {
-            {
-                var sqldao: *SqlitePasteDao = try allocator.create(SqlitePasteDao);
-                sqldao.* = .{ .pool = options.sqlite.? };
-                const dao = try allocator.create(PasteDao);
-                dao.* = sqldao.create();
-                try dao.create_table_if_not_exists();
-                self.service = PasteService.create(.{
-                    .dao = dao
-                });
-            }
-            {
-                var sqldao: *file.SqliteFileDao = try allocator.create(file.SqliteFileDao);
-                sqldao.* = .{ .pool = options.sqlite.? };
-                const dao = try allocator.create(file.FileDao);
-                dao.* = sqldao.init();
-                try dao.create_table_if_not_exists();
-                self.file_service = file.FileService {
-                    .dao = dao,
-                    .store_path = options.get_path(allocator, "uploads", "./uploads")
-                };
-            }
-        },
-    }
     return self;
 }
 
