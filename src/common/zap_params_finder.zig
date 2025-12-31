@@ -47,7 +47,20 @@ pub const Task = union(TaskType) {
 
     /// get params value as string, not include files.
     GetString: struct {
+        const GetStringType = @This();
+
         result: ?[]const u8 = null,
+        need_deinit: ?bool = null,
+
+        pub fn deinit(self: GetStringType, allocator: Allocator) void {
+            if (self.need_deinit) |flag| {
+                if (flag) {
+                    if (self.result) |r| {
+                        allocator.free(r);
+                    }
+                }
+            }
+        } 
     }
 };
 
@@ -89,7 +102,7 @@ pub fn find_params(allocator: Allocator, r: zap.Request) !?std.ArrayList([]const
 
 /// get request param value as string, need to free.
 pub fn get_string(allocator: Allocator, r: zap.Request, param_name: []const u8) !?[]const u8 {
-    const task = try get(r, param_name, allocator, .{ .GetString = .{} });
+    const task = try get(allocator, r, param_name, .{ .GetString = .{} });
     return task.GetString.result;
 }
 
@@ -145,10 +158,12 @@ pub fn callback(fiobj_value: fio.FIOBJ, context_: ?*anyopaque) callconv(.c) c_in
                     return -1;
                 },
                 .GetString => |*p| {
-                    p.*.result = zap.util.fio2strAlloc(ctx.allocator, fiobj_value) catch |e| {
+                    const str, const need_deinit = getStringData(ctx.allocator, fiobj_value) catch |e| {
                         ctx.last_error = e;
                         return -1;
                     };
+                    p.*.result = str;
+                    p.*.need_deinit = need_deinit;
                     return -1;
                 },
                 else => return -1
@@ -176,6 +191,30 @@ pub fn callback(fiobj_value: fio.FIOBJ, context_: ?*anyopaque) callconv(.c) c_in
     return 0;
 }
 
+inline fn getMimetype(o: fio.FIOBJ, key_type_wrapper: ?usize) []const u8 {
+    const key_type = if (key_type_wrapper) |t| t else fio.fiobj_str_new("type", 4);
+    defer {
+        if (key_type_wrapper == null) {
+            fio.fiobj_free_wrapped(key_type);
+        }
+    }
+
+    var mimetype: []const u8 = undefined;
+    if (fio.fiobj_hash_haskey(o, key_type) == 1) {
+        const mt_fiobj = fio.fiobj_hash_get(o, key_type);
+        // for some reason, mimetype can be an array
+        if (fio.fiobj_type_is(mt_fiobj, fio.FIOBJ_T_STRING) == 1) {
+            const mt = fio.fiobj_obj2cstr(mt_fiobj);
+            mimetype = mt.data[0..mt.len];
+        } else {
+            mimetype = &"application/octet-stream".*;
+        }
+    } else {
+        mimetype = &"application/octet-stream".*;
+    }
+    return mimetype;
+}
+
 inline fn getBinfileFromArray(o: fio.FIOBJ, i: isize) !RequestFile {
     const key_name = fio.fiobj_str_new("name", 4);
     const key_data = fio.fiobj_str_new("data", 4);
@@ -187,20 +226,6 @@ inline fn getBinfileFromArray(o: fio.FIOBJ, i: isize) !RequestFile {
     } // files: they should have "data" and "filename" keys
     if (fio.fiobj_hash_haskey(o, key_data) == 1 and fio.fiobj_hash_haskey(o, key_name) == 1) {
         const data = fio.fiobj_hash_get(o, key_data);
-
-        var mimetype: []const u8 = undefined;
-        if (fio.fiobj_hash_haskey(o, key_type) == 1) {
-            const mt_fiobj = fio.fiobj_hash_get(o, key_type);
-            // for some reason, mimetype can be an array
-            if (fio.fiobj_type_is(mt_fiobj, fio.FIOBJ_T_STRING) == 1) {
-                const mt = fio.fiobj_obj2cstr(mt_fiobj);
-                mimetype = mt.data[0..mt.len];
-            } else {
-                mimetype = &"application/octet-stream".*;
-            }
-        } else {
-            mimetype = &"application/octet-stream".*;
-        }
 
         switch (fio.fiobj_type(data)) {
             fio.FIOBJ_T_ARRAY => {
@@ -298,49 +323,11 @@ inline fn getBinfile(o: zap.fio.FIOBJ) !RequestFile {
         const filename = fio.fiobj_obj2cstr(fio.fiobj_hash_get(o, key_name));
         const data = fio.fiobj_hash_get(o, key_data);
 
-        var mimetype: []const u8 = undefined;
-        if (fio.fiobj_hash_haskey(o, key_type) == 1) {
-            const mt_fiobj = fio.fiobj_hash_get(o, key_type);
-            // for some reason, mimetype can be an array
-            if (fio.fiobj_type_is(mt_fiobj, fio.FIOBJ_T_STRING) == 1) {
-                const mt = fio.fiobj_obj2cstr(mt_fiobj);
-                mimetype = mt.data[0..mt.len];
-            } else {
-                mimetype = &"application/octet-stream".*;
-            }
-        } else {
-            mimetype = &"application/octet-stream".*;
-        }
-
+        const mimetype: []const u8 = getMimetype(o, key_type);
         var data_slice: ?[]const u8 = null;
 
         switch (fio.fiobj_type(data)) {
-            fio.FIOBJ_T_DATA => {
-                if (fio.is_invalid(data) == 1) {
-                    data_slice = "(zap: invalid data)";
-                    zap.log.warn("HTTP param binary file is not a data object", .{});
-                } else {
-                    // the data
-                    const data_len = fio.fiobj_data_len(data);
-                    var data_buf = fio.fiobj_data_read(data, data_len);
-
-                    if (data_len < 0) {
-                        zap.log.warn("HTTP param binary file size negative: {d}", .{data_len});
-                        zap.log.warn("FIOBJ_TYPE of data is: {d}", .{fio.fiobj_type(data)});
-                    } else {
-                        if (data_buf.len != data_len) {
-                            zap.log.warn("HTTP param binary file size mismatch: should {d}, is: {d}", .{ data_len, data_buf.len });
-                        }
-
-                        if (data_buf.len > 0) {
-                            data_slice = data_buf.data[0..data_buf.len];
-                        } else {
-                            zap.log.warn("HTTP param binary file buffer size negative: {d}", .{data_buf.len});
-                            data_slice = "(zap: invalid data: negative BUFFER size)";
-                        }
-                    }
-                }
-            },
+            fio.FIOBJ_T_DATA => data_slice = readData(data),
             fio.FIOBJ_T_STRING => {
                 const fiostr = fio.fiobj_obj2cstr(data);
                 if (fiostr.len == 0) {
@@ -364,4 +351,45 @@ inline fn getBinfile(o: zap.fio.FIOBJ) !RequestFile {
     } else {
         return .{};
     }
+}
+
+/// return the string and the flag about it need free or not
+inline fn getStringData(allocator: Allocator, data: zap.fio.FIOBJ) !struct {
+    ?[]const u8, bool
+} {
+    const param_type = fio.fiobj_type(data);
+    return if (param_type == fio.FIOBJ_T_DATA) .{ 
+        readData(data), false
+    } else .{
+        try zap.util.fio2strAlloc(allocator, data), true
+    };
+}
+
+inline fn readData(data: zap.fio.FIOBJ) ?[]const u8 {
+    var data_slice: ?[]const u8 = null;
+
+    if (fio.is_invalid(data) == 1) {
+        data_slice = "(zap: invalid data)";
+        zap.log.warn("HTTP param binary file is not a data object", .{});
+    } else {
+        const data_len = fio.fiobj_data_len(data);
+        var data_buf = fio.fiobj_data_read(data, data_len);
+        if (data_len < 0) {
+            zap.log.warn("HTTP param binary file size negative: {d}", .{data_len});
+            zap.log.warn("FIOBJ_TYPE of data is: {d}", .{fio.fiobj_type(data)});
+        } else {
+            if (data_buf.len != data_len) {
+                zap.log.warn("HTTP param binary file size mismatch: should {d}, is: {d}", .{ data_len, data_buf.len });
+            }
+
+            if (data_buf.len > 0) {
+                data_slice = data_buf.data[0..data_buf.len];
+            } else {
+                zap.log.warn("HTTP param binary file buffer size negative: {d}", .{data_buf.len});
+                data_slice = "(zap: invalid data: negative BUFFER size)";
+            }
+        }
+    }
+    
+    return data_slice;
 }
