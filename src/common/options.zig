@@ -180,7 +180,7 @@ pub const Options = struct {
     }
 
     fn init_sqlite(allocator:Allocator, options: *Options) !void {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         const temp_allocator = arena.allocator();
 

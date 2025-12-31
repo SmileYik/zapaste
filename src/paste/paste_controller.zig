@@ -14,12 +14,14 @@ const Allocator = std.mem.Allocator;
 
 pub const Self = @This();
 
+allocator: Allocator = undefined,
 service: ?*PasteService = undefined,
 file_service: ?*file.FileService = undefined,
 
 pub fn init(allocator: Allocator, paste_service: *PasteService, file_service: *file.FileService) !*Self {
     const self: *Self = try allocator.create(Self);
     self.* = .{
+        .allocator = allocator,
         .service = paste_service,
         .file_service = file_service
     };
@@ -129,7 +131,7 @@ inline fn handle_get_paste(
 /// + params: `raw=true` just return paste content.
 /// + body: `PasswordModel`
 fn get_locked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
@@ -156,7 +158,7 @@ fn get_locked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), 
 /// 
 /// + params: `raw=true` just return paste content.
 fn get_unlocked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
@@ -173,7 +175,7 @@ fn get_unlocked_paste(self: *Self, path_variables: std.StringHashMap([]const u8)
 /// + `page_size`: optional, default 10, means how many paste items should be returned.
 /// + `page_no`: optional, default 1, means the page number
 fn list_public_pastes(self: *Self, req: zap.Request) !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
@@ -199,7 +201,7 @@ fn list_public_pastes(self: *Self, req: zap.Request) !void {
 fn delete_unlock_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
@@ -217,7 +219,7 @@ fn delete_unlock_paste(self: *Self, path_variables: std.StringHashMap([]const u8
 fn delete_locked_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req: zap.Request) !void {
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
@@ -273,7 +275,7 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         std.debug.dumpStackTrace(trace.*);
     };
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
@@ -314,7 +316,7 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
     const not_update_message = comptime PasteResult.init(404, null, "Not found paste or not have update payload.");
     errdefer common.Result.UnknownError.send_json(req, strip_null_field);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 

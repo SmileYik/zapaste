@@ -42,9 +42,12 @@ var options: Options = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) {
-        std.debug.print("Memory leak detected!\n", .{});
-    };
+    defer {
+        std.debug.print("Checking memory leak...\n", .{});
+        if (gpa.deinit() == .leak) {
+            std.debug.print("Memory leak detected!\n", .{});
+        }
+    }
     const gpa_allocator = gpa.allocator();
 
     var arena = std.heap.ArenaAllocator.init(gpa_allocator);

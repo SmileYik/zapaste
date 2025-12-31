@@ -45,7 +45,7 @@ pub const PasteService = struct {
     }
 
     pub fn create_paste(self: *Self, gpa: Allocator, paste: Paste) !Paste {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
@@ -149,7 +149,7 @@ pub const PasteService = struct {
         password: ?[]const u8, 
         force_update: bool
     ) !?Paste {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
