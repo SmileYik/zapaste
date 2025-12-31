@@ -13,6 +13,7 @@ insert_file_fn: *const fn (ptr: *anyopaque, entity: File) anyerror!?u64,
 delete_file_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!void,
 delete_file_by_hash_fn: *const fn (ptr: *anyopaque, hash: []const u8) anyerror!void,
 list_file_by_ids_fn: *const fn (ptr: *anyopaque, allocator: Allocator, ids: []const u64) anyerror!?[]File,
+list_file_by_ids_string_fn: *const fn (ptr: *anyopaque, allocator: Allocator, ids: []const u8) anyerror!?[]File,
 
 pub fn create_table_if_not_exists(self: Self) anyerror!void {
     return self.create_table_if_not_exists_fn(self.ptr);
@@ -28,6 +29,10 @@ pub fn get_file_by_hash(self: Self, allocator: Allocator, hash: []const u8) anye
 
 pub fn list_file_by_ids(self: Self, allocator: Allocator, ids: []const u64) anyerror!?[]File {
     return self.list_file_by_ids_fn(self.ptr, allocator, ids);
+}
+
+pub fn list_file_by_ids_string(self: Self, allocator: Allocator, ids: []const u8) anyerror!?[]File {
+    return self.list_file_by_ids_string_fn(self.ptr, allocator, ids);
 }
 
 pub fn insert_file(self: Self, entity: File) anyerror!?u64 {

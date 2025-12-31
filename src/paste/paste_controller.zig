@@ -55,6 +55,8 @@ const PastePageResult = common.Result.create(Paste.Page);
 
 const PasteResult = common.Result.create(Paste);
 
+const PasteModelResult = common.Result.create(PasteModel);
+
 const PasswordModel = struct {
     password: ?[]const u8 = null
 };
@@ -62,6 +64,29 @@ const PasswordModel = struct {
 const UpdatePasteModel = struct {
     password: ?[]const u8 = null,
     paste: ?Paste = null
+};
+
+const PasteModel = struct {
+    paste: ?Paste = null,
+    files: ?[]file.File = null,
+
+    fn init(ctx: *Self, allocator: Allocator, paste: Paste) !PasteModel {
+        var files: ?[]file.File = null;
+
+        if (paste.attachements) |attachements| {
+            files = try ctx.file_service.?.list_file_by_ids_string(allocator, attachements);
+        }
+        return .{
+            .paste = paste,
+            .files = files
+        };
+    }
+
+    fn deinit(self: PasteModel, allocator: Allocator) void {
+        if (self.files) |files| {
+            allocator.free(files);
+        }
+    }
 };
 
 const result_name_cannot_empty = PasteResult.init(500, null, "Paste name cannot be empty.");
@@ -117,8 +142,10 @@ inline fn handle_get_paste(
 
             var new = try p.dupe(allocator);
             new.password = null;
-            break :blk PasteResult.success(new, null);
-        } else PasteResult.init(404, null, "Paste not found or incorrect password");
+
+            const model = try PasteModel.init(self, allocator, new);
+            break :blk PasteModelResult.success(model, null);
+        } else PasteModelResult.init(404, null, "Paste not found or incorrect password");
     result.send_json(req, strip_null_field);
 }
 
@@ -295,13 +322,13 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         if (ids) |list| {
             if (list.items.len > 0) entity.attachements = list.items[1..];
         }
-        const result = if (self.service.?.create_paste(allocator, entity)) |inserted| blk: {
-            break :blk PasteResult.success(inserted, "success");
-        } else |e| blk: {
-            break :blk try PasteResult.failed(allocator, e, "failed to create");
-        };
-
-        result.send_json(req, strip_null_field);
+        if (self.service.?.create_paste(allocator, entity)) |inserted| {
+            var pmodel = try PasteModel.init(self, allocator, inserted);
+            defer pmodel.deinit(allocator);
+            PasteModelResult.success(pmodel, "success").send_json(req, strip_null_field);
+        } else |e| {
+            (try PasteModelResult.failed(allocator, e, "failed to create")).send_json(req, strip_null_field);
+        }
     }
 }
 
@@ -336,11 +363,13 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
             paste.latest_read_at = null;
 
             if (ids) |list| {
-                if (list.items.len > 0) paste.attachements = list.items[1..];
+                if (list.items.len > 0) {
+                    paste.attachements = list.items[1..] ;
+                }
             }
             
             const name = path_variables.get("name").?;
-            const updated = self.service.?.update_paste(allocator, paste, name, model.password, false)
+            const updated = self.service.?.update_paste(allocator, paste, name, model.password, null, false)
             catch |err| switch (err) {
                 error.PasswordRequired => {
                     result_no_password.send_json(req, strip_null_field);
@@ -359,7 +388,9 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
             if (updated) |u| {
                 var e = u;
                 e.password = null;
-                PasteResult.success(e, "Updated").send_json(req, strip_null_field);
+                var pmodel = try PasteModel.init(self, allocator, e);
+                defer pmodel.deinit(allocator);
+                PasteModelResult.success(pmodel, "Updated").send_json(req, strip_null_field);
                 return;
             }
         }

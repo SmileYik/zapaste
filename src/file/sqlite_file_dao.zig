@@ -58,6 +58,7 @@ pub fn init(self: *Self) FileDao {
         .delete_file_fn = delete_file,
         .delete_file_by_hash_fn = delete_file_by_hash,
         .list_file_by_ids_fn = list_file_by_ids,
+        .list_file_by_ids_string_fn = list_file_by_ids_string
     };
 }
 
@@ -124,6 +125,23 @@ fn list_file_by_ids(ptr: *anyopaque, allocator: Allocator, ids: []const u64) any
         allocator,
         .{},
         ids,
+    );
+}
+
+fn list_file_by_ids_string(ptr: *anyopaque, allocator: Allocator, ids: []const u8) anyerror!?[]File {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const conn = try self.pool.get_connection();
+    defer conn.release();
+
+    const sql = try std.fmt.allocPrint(allocator, SELECT_SQL ++ " WHERE file.id IN ({s}) ", .{ ids });
+
+    var stmt = try conn.get_db().prepareDynamic(sql);
+    defer stmt.deinit();
+    return try stmt.all(
+        File,
+        allocator,
+        .{},
+        .{},
     );
 }
 

@@ -145,13 +145,18 @@ pub const PasteService = struct {
         self: *Self, 
         gpa: Allocator, 
         paste: Paste, 
-        name: []const u8, 
-        password: ?[]const u8, 
+        name: []const u8,
+        password: ?[]const u8,
+        new_attachements: ?[] const u8,
         force_update: bool
     ) !?Paste {
         var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
         const temp_gpa = arena.allocator();
+
+        // TODO new attachement
+        // if pass entity's field is null and new_attach is not then just concat
+        _ = new_attachements;
 
         var entity = try paste.dupe(temp_gpa);
         entity.name = null;
@@ -169,6 +174,12 @@ pub const PasteService = struct {
                 ).len;
                 entity.has_password = password_len != 0;
 
+                if (entity.attachements) |attach| {
+                    if (stored.attachements) |attachements| {
+                        entity.attachements = try std.fmt.allocPrint(temp_gpa, "{s},{s}", .{ attachements, attach });
+                    }
+                }
+                
                 return try self.dao.?.update_paste(gpa, entity);
             }
             return error.PasswordRequired;
