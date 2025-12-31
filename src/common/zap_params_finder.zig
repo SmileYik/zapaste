@@ -277,6 +277,11 @@ inline fn getBinfileFromArray(o: fio.FIOBJ, i: isize) !RequestFile {
 }
 
 inline fn getBinfileArrayLen(o: fio.FIOBJ) !usize {
+    // the object may not FIOBJ_T_HASH TYPE, then just return 0;
+    if (fio.fiobj_type(o) != fio.FIOBJ_T_HASH) {
+        return 0;
+    }
+
     const key_name = fio.fiobj_str_new("name", 4);
     const key_data = fio.fiobj_str_new("data", 4);
     const key_type = fio.fiobj_str_new("type", 4);
