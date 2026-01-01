@@ -1,7 +1,5 @@
 const std = @import("std");
 const crypto = std.crypto;
-const base64 = std.base64.standard_encoder;
-const base64_decoder = std.base64.standard_decoder;
 const Allocator = std.mem.Allocator;
 
 pub const AesGcmTool = struct {
@@ -65,9 +63,9 @@ pub const AesGcmTool = struct {
         const bytes = try self.encrypt(allocator, input);
         defer allocator.free(bytes);
 
-        const len = std.base64.standard.Encoder.calcSize(bytes.len);
+        const len = std.base64.url_safe.Encoder.calcSize(bytes.len);
         const out = try allocator.alloc(u8, len);
-        _ = std.base64.standard.Encoder.encode(out, bytes);
+        _ = std.base64.url_safe.Encoder.encode(out, bytes);
 
         return out;
     }
@@ -81,11 +79,11 @@ pub const AesGcmTool = struct {
 
     /// need free return
     pub fn decrypt_from_base64(self: Self, allocator: Allocator, input: []const u8) ![]u8 {
-        const len = try std.base64.standard.Decoder.calcSizeForSlice(input);
+        const len = try std.base64.url_safe.Decoder.calcSizeForSlice(input);
         const bytes = try allocator.alloc(u8, len);
         defer allocator.free(bytes);
 
-        try std.base64.standard.Decoder.decode(bytes, input);
+        try std.base64.url_safe.Decoder.decode(bytes, input);
         
         return self.decrypt(allocator, bytes);
     }
