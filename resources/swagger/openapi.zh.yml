@@ -263,7 +263,6 @@ components:
         attachements: { type: string, nullable: true, description: "逗号分隔的文件 ID 列表" }
         private: { type: boolean, nullable: true, description: "是否为私有" }
         read_only: { type: boolean, nullable: true, description: "是否只读" }
-        editable: { type: boolean, nullable: true, description: "是否可编辑" }
         has_password: { type: boolean, nullable: true, description: "是否有密码保护" }
         password: { type: string, nullable: true, description: "内容密码" }
         read_count: { type: integer, format: int64, nullable: true, description: "阅读次数" }
@@ -281,7 +280,6 @@ components:
         name: { type: string, nullable: true }
         content_type: { type: string, nullable: true }
         read_only: { type: boolean, nullable: true }
-        editable: { type: boolean, nullable: true }
         has_password: { type: boolean, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
         latest_read_at: { type: integer, format: int64, nullable: true }

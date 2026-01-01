@@ -80,7 +80,6 @@ pub const SqlitePasteDao = struct {
         \\  attachements TEXT,
         \\  private INTEGER,
         \\  read_only INTEGER,
-        \\  editable INTEGER,
         \\  has_password INTEGER,
         \\  password TEXT,
         \\  read_count INTEGER,
@@ -100,7 +99,6 @@ pub const SqlitePasteDao = struct {
         \\  paste.attachements, 
         \\  paste.private, 
         \\  paste.read_only, 
-        \\  paste.editable, 
         \\  paste.has_password, 
         \\  paste.password, 
         \\  paste.read_count, 
@@ -118,7 +116,6 @@ pub const SqlitePasteDao = struct {
         \\  paste.name, 
         \\  paste.content_type, 
         \\  paste.read_only, 
-        \\  paste.editable, 
         \\  paste.has_password, 
         \\  paste.read_count, 
         \\  paste.latest_read_at, 
@@ -137,7 +134,6 @@ pub const SqlitePasteDao = struct {
         \\  (:attachements IS NULL OR attachements = :attachements) AND
         \\  (:private IS NULL OR private = :private) AND
         \\  (:read_only IS NULL OR read_only = :read_only) AND
-        \\  (:editable IS NULL OR editable = :editable) AND
         \\  (:has_password IS NULL OR has_password = :has_password) AND
         \\  (:password IS NULL OR password = :password) AND
         \\  (:read_count IS NULL OR read_count = :read_count) AND
@@ -156,7 +152,6 @@ pub const SqlitePasteDao = struct {
         \\  attachements, 
         \\  private, 
         \\  read_only, 
-        \\  editable, 
         \\  has_password, 
         \\  password, 
         \\  read_count, 
@@ -172,7 +167,6 @@ pub const SqlitePasteDao = struct {
         \\  :attachements, 
         \\  :private, 
         \\  :read_only, 
-        \\  :editable, 
         \\  :has_password, 
         \\  :password, 
         \\  :read_count, 
@@ -191,7 +185,6 @@ pub const SqlitePasteDao = struct {
         \\  attachements = COALESCE(:attachements, attachements),
         \\  private = COALESCE(:private, private),
         \\  read_only = COALESCE(:read_only, read_only),
-        \\  editable = COALESCE(:editable, editable),
         \\  has_password = COALESCE(:has_password, has_password),
         \\  password = COALESCE(:password, password),
         \\  read_count = COALESCE(:read_count, read_count),

@@ -247,7 +247,6 @@ components:
         attachements: { type: string, nullable: true, description: "Comma separated file IDs" }
         private: { type: boolean, nullable: true }
         read_only: { type: boolean, nullable: true }
-        editable: { type: boolean, nullable: true }
         has_password: { type: boolean, nullable: true }
         password: { type: string, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
@@ -264,7 +263,6 @@ components:
         name: { type: string, nullable: true }
         content_type: { type: string, nullable: true }
         read_only: { type: boolean, nullable: true }
-        editable: { type: boolean, nullable: true }
         has_password: { type: boolean, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
         latest_read_at: { type: integer, format: int64, nullable: true }

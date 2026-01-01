@@ -18,7 +18,6 @@ pub const Paste = struct {
     attachements: ?[]const u8 = null,
     private: ?bool = null,
     read_only: ?bool = null,
-    editable: ?bool = null,
     
     has_password: ?bool = null,
     password: ?[]const u8 = null,
@@ -57,7 +56,6 @@ pub const Paste = struct {
         name: ?[]const u8 = null,
         content_type: ?[]const u8 = null,
         read_only: ?bool = null,
-        editable: ?bool = null,
         has_password: ?bool = null,
         read_count: ?u64 = null,
         latest_read_at: ?u64 = null,
