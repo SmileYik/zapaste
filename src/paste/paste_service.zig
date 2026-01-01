@@ -54,11 +54,8 @@ pub const PasteService = struct {
         entity.name = entity.name orelse try self.random_animal_name(temp_gpa);
         entity.profiles = entity.profiles orelse "{}";
         entity.create_at = @intCast(std.time.timestamp());
-        entity.latest_read_at = @intCast(std.time.timestamp());
-        
-        const password_len = std.mem.trim(u8, entity.password orelse "", " \n\r\t").len;
-        entity.has_password = password_len != 0;
-        // TODO some password thing,
+        entity.latest_read_at = @intCast(std.time.timestamp()); 
+        try update_password(temp_gpa, &entity, entity.password orelse "");
 
         const retry = 3;
         for (0..retry) |i| {
@@ -101,7 +98,7 @@ pub const PasteService = struct {
         }
         const paste = try self.find_paste(gpa, query.name.?);
         if (paste) |p| {
-            if (check_paste_passwod(&p, query.password)) {
+            if (try check_paste_password(gpa, &p, query.password)) {
                 self.increase_read_count(p) catch |e| {
                     std.log.debug("[PasteService] failed increase read count: {}", .{e});
                 };
@@ -118,7 +115,7 @@ pub const PasteService = struct {
     pub fn delete_paste(self: *Self, allocator: Allocator, name: []const u8, password: ?[]const u8, force_delete :bool) !bool {
         const paste = try self.find_paste(allocator, name);
         if (paste) |p| {
-            if (force_delete or check_paste_passwod(&p, password)) {
+            if (force_delete or try check_paste_password(allocator, &p, password)) {
                 _ = try self.dao.?.delete_paste_by_name(name);
                 return true;
             }
@@ -127,12 +124,12 @@ pub const PasteService = struct {
         return false;
     }
     
-    inline fn check_paste_passwod(paste: *const Paste, password: ?[]const u8) bool {
+    inline fn check_paste_password(allocator: Allocator, paste: *const Paste, password: ?[]const u8) !bool {
         var success: bool = true;
-        if (paste.has_password != null and paste.has_password.?) {
-            if (!std.mem.eql(u8, paste.password orelse "", password orelse "")) {
-                success = false;
-            }
+        if (paste.password) |pp| {
+            if (password) |p| {
+                success = compare_password(allocator, pp, p);
+            } else success = false;
         }
         return success;
     }
@@ -159,16 +156,10 @@ pub const PasteService = struct {
         if (try self.find_paste(temp_gpa, name)) |stored| {
             if (!force_update and stored.read_only orelse false) {
                 return error.ReadOnly;
-            } else if (force_update or check_paste_passwod(&stored, password)) {
+            } else if (force_update or try check_paste_password(temp_gpa, &stored, password)) {
                 entity.id = stored.id;
-
-                // TODO password things
-                const password_len = std.mem.trim(
-                    u8, 
-                    entity.password orelse stored.password orelse "", 
-                    " \n\r\t"
-                ).len;
-                entity.has_password = password_len != 0;
+                
+                try update_password(temp_gpa, &entity, entity.password orelse stored.password orelse "");
 
                 // attachement things
                 var real_attachements: ?[]const u8 = null;
@@ -244,6 +235,36 @@ pub const PasteService = struct {
         );
     }
 };
+
+inline fn update_password(allocator: Allocator, entity: *Paste, password: ?[]const u8) !void {
+    const password_len = std.mem.trim(
+        u8, 
+        password orelse "", 
+        " \n\r\t"
+    ).len;
+    entity.has_password = if (password_len == 0) false else blk: {
+        entity.password = try encode_password(allocator, password.?);
+        break :blk true;
+    };
+}
+
+/// need free
+inline fn encode_password(allocator: Allocator, password: []const u8) ![]const u8 {
+    var hash: [128]u8 = undefined;
+    return try std.crypto.pwhash.argon2.strHash(password, .{
+        .allocator = allocator,
+        .params = std.crypto.pwhash.argon2.Params.owasp_2id
+    }, &hash);
+}
+
+inline fn compare_password(allocator: Allocator, hash: []const u8, password: []const u8) bool {
+    std.crypto.pwhash.argon2.strVerify(hash, password, .{
+        .allocator = allocator
+    }) catch {
+        return false;
+    };
+    return true;
+}
 
 fn split_static_file(comptime filename: []const u8) []const []const u8 {
     @setEvalBranchQuota(2000000);

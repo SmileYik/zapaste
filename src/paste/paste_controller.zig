@@ -75,13 +75,15 @@ const PasteModel = struct {
     files: ?[]file.File = null,
 
     fn init(ctx: *Self, allocator: Allocator, paste: Paste) !PasteModel {
-        var files: ?[]file.File = null;
+        var p = paste;
+        p.password = null;
 
-        if (paste.attachements) |attachements| {
+        var files: ?[]file.File = null;
+        if (p.attachements) |attachements| {
             files = try ctx.file_service.?.list_file_by_ids_string(allocator, attachements);
         }
         return .{
-            .paste = paste,
+            .paste = p,
             .files = files
         };
     }
