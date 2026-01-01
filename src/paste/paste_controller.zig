@@ -323,6 +323,7 @@ fn create_paste(self: *Self, req: zap.Request) !void {
         if (req.isFinished()) return;
 
         var entity: Paste = var_parsed.value;
+        entity.attachements = null;
         if (ids) |list| {
             if (list.items.len > 0) entity.attachements = list.items[1..];
         }
