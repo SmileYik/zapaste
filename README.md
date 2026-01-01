@@ -28,16 +28,19 @@ Zapaste is a Pastebin service built using Zig and the Zap web framework.
 - Paginated retrieval of public pastes.
 - Password-protected paste access via POST.
 - Support for `raw` text output via query parameters.
-- random pastebin name
-- RESTful API
-- Self-hosted
+- Random pastebin name.
+- File upload and download.
+- The same file is stored only once.
+- Download file by CURL directly.
+- RESTful API.
+- Self-hosted.
 
 ## FAQ
 
 - Q: Does Zapaste work on Windows?
   - Can not directly work on Windows, but it can work on wsl2 or a docker container.
 - Q: Does support upload/download files?
-  - Not now, but still woring for it.
+  - Basic support now, you can view swagger api.
 
 ## Build
 
@@ -113,7 +116,8 @@ docker run -it --rm \
 
 ### HTTP API
 
-You can find [swagger configuration] in `resources` folder.
+You can find [swagger configuration] in `resources` folder.  
+Or you can dirictly goto [online swagger editor]!
 
 ## Configuration
 
@@ -149,9 +153,11 @@ Example configuration file: [default configuration]
 
   - **`prefix`**: static web request path prefix, default `/`
 
-  - **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access direcory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
+  - **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access directory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
 
 - **`work_dir`**: the directory data stored. default `./`.
+
+- **`upload_dir`**: the uploaded file stored (Relative path, relative to `work_dir`, if you set `uploads`, then will access directory `${work_dir}/uploads`). default `uploads`
 
 - **`bind_port`**: bind service port, default `3000`
 
@@ -246,3 +252,4 @@ For example, you can allow all CROS OPTIONS request by below configuration:
 [default configuration]: ./resources/config.json
 [swagger configuration]: ./resources/swagger/openapi.yml
 [zig action]: https://github.com/SmileYik/zapaste/actions/workflows/zig.yml
+[online swagger editor]: https://editor.swagger.io/?url=https://raw.githubusercontent.com/SmileYik/zapaste/refs/heads/master/resources/swagger/openapi.yml
