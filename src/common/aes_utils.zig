@@ -9,7 +9,6 @@ pub const AesGcmTool = struct {
     const TagSize = Gcm.tag_length;
     pub const KeySize = Gcm.key_length;
 
-    allocator: ?Allocator = null,
     key: [KeySize]u8,
 
     /// init by KeySize bytes
@@ -17,20 +16,12 @@ pub const AesGcmTool = struct {
         return .{ .key = key };
     }
 
-    pub fn random_key(allocator: Allocator) !Self {
-        var key = try allocator.alloc(u8, KeySize);
-        crypto.random.bytes(key);
-        const key_slice: *[KeySize]u8 = key[0..KeySize];
+    pub fn random_key() Self {
+        var key: [KeySize]u8 = undefined;
+        crypto.random.bytes(&key);
         return .{
-            .key = key_slice.*,
-            .allocator = allocator
+            .key = key,
         };
-    }
-
-    pub fn deinit(self: Self) void {
-        if (self.allocator) |a| {
-            a.free(self.key);
-        }
     }
 
     /// need free return.
@@ -98,8 +89,7 @@ pub const AesGcmTool = struct {
 test "AesGcmTool encryption/decryption" {
     const allocator = std.testing.allocator;
     
-    const tool = AesGcmTool.random_key(allocator);
-    defer tool.deinit();
+    const tool = AesGcmTool.random_key();
 
     const original_text = "hello abc";
     

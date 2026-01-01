@@ -58,12 +58,13 @@ pub const PasteService = struct {
         try update_password(temp_gpa, &entity, entity.password orelse "");
 
         const retry = 3;
+        const count: usize = 4;
         for (0..retry) |i| {
             const result = self.dao.?.insert_paste(entity) catch |err| {
                 if (retry == i + 1) {
                     if (err == sqlite.Error.SQLiteConstraint) {
                         const name = try std.fmt.allocPrint(temp_gpa, "{s}-{s}", .{ 
-                            entity.name.?, try self.random_string(temp_gpa, 4)
+                            entity.name.?, try self.random_string(temp_gpa, count * (i + 1))
                         });
                         entity.name = name;
                         if (try self.dao.?.insert_paste(entity)) |id| {
@@ -75,7 +76,7 @@ pub const PasteService = struct {
                 }
                 if (has_name) {
                     entity.name = try std.fmt.allocPrint(temp_gpa, "{s}-{s}", .{ 
-                        entity.name.?, try self.random_string(temp_gpa, 4)
+                        entity.name.?, try self.random_string(temp_gpa, count * (i + 1))
                     });
                 } else {
                     entity.name = try self.random_animal_name(temp_gpa);
@@ -126,11 +127,14 @@ pub const PasteService = struct {
     
     inline fn check_paste_password(allocator: Allocator, paste: *const Paste, password: ?[]const u8) !bool {
         var success: bool = true;
-        if (paste.password) |pp| {
-            if (password) |p| {
-                success = compare_password(allocator, pp, p);
-            } else success = false;
+        if (paste.has_password orelse false) {
+            if (paste.password) |pp| {
+                if (password) |p| {
+                    success = compare_password(allocator, pp, p);
+                } else success = false;
+            }
         }
+        
         return success;
     }
 
@@ -253,7 +257,7 @@ inline fn encode_password(allocator: Allocator, password: []const u8) ![]const u
     var hash: [128]u8 = undefined;
     return try std.crypto.pwhash.argon2.strHash(password, .{
         .allocator = allocator,
-        .params = std.crypto.pwhash.argon2.Params.owasp_2id
+        .params = .{ .t = 1, .m = 8192, .p = 1 }
     }, &hash);
 }
 

@@ -84,7 +84,7 @@ pub fn main() !void {
     };
     defer router.deinit();
 
-    try zapaste.common.StaticController.init(allocator, router, &options);
+    try zapaste.common.StaticController.init(gpa_allocator, router, &options);
     const swagger_controller = try zapaste.swagger.SwaggerController.init(
         allocator, router, "/swagger", &options
     );
@@ -93,14 +93,15 @@ pub fn main() !void {
         zapaste.swagger.SwaggerController.info(options.bind_port.?);
     }
 
-    const paste_controller = PasteController.init(
-        allocator, 
+    var paste_controller = PasteController.init(
+        gpa_allocator, 
         zapaste.paste.get_paste_service().?, 
         zapaste.file.get_file_service().?
     ) catch |e| {
         std.debug.print("PasteController initialize failed: {}", .{e});
         return;
     };
+    defer paste_controller.deinit();
 
     paste_controller.register(allocator, router, "/api/paste")
     catch |e| {
