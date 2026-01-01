@@ -17,3 +17,9 @@ pub const RouterOptions = variable_router.RouterOptions;
 pub const StaticController = @import("static_controller.zig");
 
 pub const ZapParamsFinder = @import("zap_params_finder.zig");
+
+pub const ase_util = @import("aes_utils.zig");
+
+test {
+    @import("std").testing.refAllDecls(@This());
+}
