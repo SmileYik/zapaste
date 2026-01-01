@@ -103,6 +103,8 @@ fn get_file_by_hash(ptr: *anyopaque, allocator: Allocator, hash: []const u8) any
 }
 
 fn list_file_by_ids(ptr: *anyopaque, allocator: Allocator, ids: []const u64) anyerror!?[]File {
+    if (ids.len == 0) return null;
+
     const self: *Self = @ptrCast(@alignCast(ptr));
     const conn = try self.pool.get_connection();
     defer conn.release();
@@ -129,6 +131,8 @@ fn list_file_by_ids(ptr: *anyopaque, allocator: Allocator, ids: []const u64) any
 }
 
 fn list_file_by_ids_string(ptr: *anyopaque, allocator: Allocator, ids: []const u8) anyerror!?[]File {
+    if (ids.len == 0) return null;
+    
     const self: *Self = @ptrCast(@alignCast(ptr));
     const conn = try self.pool.get_connection();
     defer conn.release();

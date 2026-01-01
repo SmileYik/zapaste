@@ -154,10 +154,6 @@ pub const PasteService = struct {
         defer arena.deinit();
         const temp_gpa = arena.allocator();
 
-        // TODO new attachement
-        // if pass entity's field is null and new_attach is not then just concat
-        _ = new_attachements;
-
         var entity = try paste.dupe(temp_gpa);
         entity.name = null;
         if (try self.find_paste(temp_gpa, name)) |stored| {
@@ -174,11 +170,55 @@ pub const PasteService = struct {
                 ).len;
                 entity.has_password = password_len != 0;
 
-                if (entity.attachements) |attach| {
-                    if (stored.attachements) |attachements| {
-                        entity.attachements = try std.fmt.allocPrint(temp_gpa, "{s},{s}", .{ attachements, attach });
+                // attachement things
+                var real_attachements: ?[]const u8 = null;
+                var attachements = try std.ArrayList(u8).initCapacity(temp_gpa, 1024);
+                defer attachements.deinit(temp_gpa);
+                {
+                    var ids = try std.ArrayList([]const u8).initCapacity(temp_gpa, 1024);
+                    defer ids.deinit(temp_gpa);
+                    var old_set = std.StringHashMap(bool).init(temp_gpa);
+                    defer old_set.deinit();
+                    var set = std.StringHashMap(bool).init(temp_gpa);
+                    defer set.deinit();
+
+                    if (stored.attachements) |old_attach| {
+                        var old = std.mem.splitAny(u8, old_attach, ",");
+                        while (old.next()) |id| {
+                            try old_set.put(id, true);
+                        }
+
+                        if (entity.attachements) |new_attach| {
+                            var new = std.mem.splitAny(u8, new_attach, ",");
+                            while (new.next()) |id| {
+                                if (old_set.contains(id) and !set.contains(id)) {
+                                    try set.put(id, true);
+                                    try attachements.append(temp_gpa, ',');
+                                    try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id });
+                                }
+                            }
+                        } else {
+                            var old_iter = old_set.keyIterator();
+                            while (old_iter.next()) |id| {
+                                try set.put(id.*, true);
+                                try attachements.append(temp_gpa, ',');
+                                try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id.* });
+                            }
+                        }
                     }
+                    if (new_attachements) |new_attach| {
+                        var new = std.mem.splitAny(u8, new_attach, ",");
+                        while (new.next()) |id| {
+                            if (!set.contains(id)) {
+                                try set.put(id, true);
+                                try attachements.append(temp_gpa, ',');
+                                try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id });
+                            }
+                        }
+                    }
+                    real_attachements = if (attachements.items.len > 0) attachements.items[1..] else "";
                 }
+                entity.attachements = real_attachements;
                 
                 return try self.dao.?.update_paste(gpa, entity);
             }

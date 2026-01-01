@@ -362,14 +362,15 @@ fn update_paste(self: *Self, path_variables: std.StringHashMap([]const u8), req:
             paste.create_at = null;
             paste.latest_read_at = null;
 
+            var attachments: ?[]const u8 = null;
             if (ids) |list| {
                 if (list.items.len > 0) {
-                    paste.attachements = list.items[1..] ;
+                    attachments = list.items[1..] ;
                 }
             }
             
             const name = path_variables.get("name").?;
-            const updated = self.service.?.update_paste(allocator, paste, name, model.password, null, false)
+            const updated = self.service.?.update_paste(allocator, paste, name, model.password, attachments, false)
             catch |err| switch (err) {
                 error.PasswordRequired => {
                     result_no_password.send_json(req, strip_null_field);
