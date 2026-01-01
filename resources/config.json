@@ -1,6 +1,7 @@
 {
     "dao_type": "Sqlite",
     "work_dir": "./",
+    "upload_dir": "uploads",
     "sqlite_options": {
         "memory_mode": false,
         "pool_size": 2,

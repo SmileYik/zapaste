@@ -72,6 +72,9 @@ pub const Options = struct {
         /// work dir, where data stored
         work_dir: ?[]const u8 = "./",
 
+        /// upload dir.
+        upload_dir: ?[]const u8 = "uploads",
+
         /// if your dao_type is Sqlite, then you can configure your sqlite options.
         sqlite_options: ?JsonSqliteOptions = JsonSqliteOptions {},
 
@@ -101,6 +104,7 @@ pub const Options = struct {
 
     dao_type: DaoType,
     work_dir: ?[]const u8 = "./",
+    upload_dir: ?[]const u8 = "uploads",
     sqlite: ?*SimpleSqlitePool = null,
     sqlite_options: ?SqliteOptions = .{},
     bind_port: ?u16 = 3000,
@@ -114,7 +118,7 @@ pub const Options = struct {
     web: ?WebOptions = WebOptions {},
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
-        return std.fmt.allocPrint(gpa, "{s}{s}", .{ self.work_dir.?, path }) catch |e| {
+        return std.fmt.allocPrint(gpa, "{s}/{s}", .{ self.work_dir.?, path }) catch |e| {
             std.debug.print("Out of memery when get path: {any}", .{e});
             return fallback_path;
         };
@@ -138,6 +142,7 @@ pub const Options = struct {
         options.enable_log = options.enable_log orelse default_opt.enable_log;
         options.threads = options.threads orelse default_opt.threads;
         options.workers = options.workers orelse default_opt.workers;
+        options.upload_dir = options.upload_dir orelse default_opt.upload_dir;
 
         options.custom_headers = try json_obj_to_string_map(gpa, opt.custom_headers);
         options.cors_headers = try json_obj_to_string_map(gpa, opt.cors_headers);

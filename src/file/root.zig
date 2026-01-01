@@ -34,7 +34,7 @@ pub fn init_file(allocator: Allocator, options: *common.Options) !bool {
 
         service.* = .{
             .dao = dao,
-            .store_path = options.get_path(allocator, "uploads", "./uploads")
+            .store_path = options.get_path(allocator, options.upload_dir orelse "uploads", "./uploads")
         };
         file_service = service;
         return true;
