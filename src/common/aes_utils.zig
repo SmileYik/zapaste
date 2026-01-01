@@ -72,6 +72,13 @@ pub const AesGcmTool = struct {
         return out;
     }
 
+    pub fn encrypt_model_to_base64(self: Self, comptime T: type, allocator: Allocator, input: T) ![]u8 {
+        const formatter = std.json.fmt(input, .{ .emit_null_optional_fields = false });
+        const json = try std.fmt.allocPrint(allocator, "{f}", .{formatter});
+        defer allocator.free(json);
+        return self.encrypt_to_base64(allocator, json);
+    }
+
     /// need free return
     pub fn decrypt_from_base64(self: Self, allocator: Allocator, input: []const u8) ![]u8 {
         const len = try std.base64.standard.Decoder.calcSizeForSlice(input);
@@ -81,6 +88,12 @@ pub const AesGcmTool = struct {
         try std.base64.standard.Decoder.decode(bytes, input);
         
         return self.decrypt(allocator, bytes);
+    }
+    
+    pub fn decrypt_model_to_base64(self: Self, comptime T: type, allocator: Allocator, input: []const u8) !std.json.Parsed(T) {
+        const json = try self.decrypt_from_base64(allocator, input);
+        defer allocator.free(json);
+        return try std.json.parseFromSlice(T, allocator, json, .{ .ignore_unknown_fields = true });
     }
 };
 

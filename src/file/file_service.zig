@@ -57,6 +57,10 @@ pub fn list_file_by_ids_string(self: *Self, allocator: Allocator, ids: []const u
     return self.dao.list_file_by_ids_string(allocator, ids);
 }
 
+pub fn get_file_disk_path(self: *Self, allocator: Allocator, hash: []const u8) ![]const u8 {
+    return try self.get_file_path(allocator, hash);
+}
+
 inline fn get_file_path(self: *Self, allocator: Allocator, filename: []const u8) ![]const u8 {
     return std.fmt.allocPrint(allocator, "{s}/{s}/{s}/{s}", .{
         self.store_path, filename[0..2], filename[2..4], filename
