@@ -1,50 +1,36 @@
 openapi: 3.0.0
 info:
-  title: Zapaste API
-  description: |
-    A Pastebin service built using Zig and the Zap web framework.
-    
-    **Key Features:**
-    - Paginated retrieval of public pastes.
-    - Password-protected paste access via POST.
-    - Automatic sensitive data stripping (passwords removed from responses).
-    - Support for `raw` text output via query parameters.
+  title: Paste Service API
+  description: A Zig-based Pastebin service with support for file attachments and password-protected content.
   version: 1.0.0
 
 paths:
   /api/paste:
     get:
-      summary: List Public Pastes
-      description: Returns a paginated summary of all pastes not marked as private.
+      summary: List public pastes
+      description: Returns a paginated summary of publicly available pastes.
       parameters:
         - name: page_size
           in: query
-          description: "Number of items per page (Default: 10)"
           schema:
             type: integer
             default: 10
         - name: page_no
           in: query
-          description: "Current page number (Default: 1)"
           schema:
             type: integer
             default: 1
       responses:
         '200':
-          description: Paginated summary list retrieved successfully.
+          description: Paginated list of paste summaries
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PastePageResult'
-
     post:
-      summary: Create New Paste
-      description: |
-        Supports two content types:
-        1. `application/json`: Direct JSON object.
-        2. `application/x-www-form-urlencoded`: JSON string passed in the `paste` field.
+      summary: Create a new paste
+      description: Create a paste with optional file attachments. Supports JSON or Multipart/form-data.
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -54,70 +40,57 @@ paths:
               type: object
               properties:
                 paste:
-                  type: string
-                  description: JSON serialized string of a Paste object.
+                  $ref: '#/components/schemas/Paste'
                 file:
                   type: array
                   items:
                     type: string
                     format: binary
-                  description: Multiple files to upload.
-              required:
-                - paste
       responses:
         '200':
-          description: Created successfully. Returns the saved object with assigned ID.
+          description: Paste created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasteResult'
+                $ref: '#/components/schemas/PasteModelResult'
 
   /api/paste/{name}:
     get:
-      summary: Get Unlocked Paste
-      description: |
-        Retrieves a paste by name. This endpoint only works for pastes without password protection. 
-        If a paste is protected, this will return an error.
+      summary: Get an unlocked paste
+      description: Retrieve a paste by name if it has no password.
       parameters:
         - name: name
           in: path
           required: true
-          description: Unique name/slug of the paste.
           schema:
             type: string
         - name: raw
           in: query
-          description: If "true", returns the raw string content instead of a JSON object.
+          description: If true, returns the raw text content only.
           schema:
-            type: string
-            enum: ["true", "false"]
+            type: boolean
       responses:
         '200':
-          description: Success. Returns JSON by default or plain text if raw=true.
+          description: Paste details or raw text
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasteResult'
+                $ref: '#/components/schemas/PasteModelResult'
             text/plain:
               schema:
                 type: string
         '404':
-          description: Paste not found or name is empty.
+          description: Paste not found or requires password
 
     post:
-      summary: Get Locked Paste
-      description: Retrieves a password-protected paste. The password must be provided in the request body.
+      summary: Get a locked paste
+      description: Retrieve a password-protected paste.
       parameters:
         - name: name
           in: path
           required: true
           schema:
             type: string
-        - name: raw
-          in: query
-          schema:
-            type: string
-            enum: ["true", "false"]
       requestBody:
         required: true
         content:
@@ -126,51 +99,17 @@ paths:
               $ref: '#/components/schemas/PasswordModel'
       responses:
         '200':
-          description: Verification successful. Returns paste content.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
+          description: Paste details retrieved successfully
         '500':
-          description: Verification failed (Incorrect password or missing payload).
-
-    delete:
-      summary: Delete Unlocked Paste
-      description: |
-        Delete a paste by name. This endpoint only works for pastes without password protection. 
-        If a paste is protected, this will return an error.
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Delete successful.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
-        '500':
-          description: Verification failed (Incorrect password or missing payload).
+          description: Incorrect password or missing body
 
     put:
-      summary: Update Paste
-      description: |
-        Update a paste by name. if paste is read-only then it will not be updated.
-        If your paste has password, you need pass password field.
+      summary: Update a paste
+      description: Updates an existing paste. Requires password if the paste is protected. Supports JSON or Multipart/form-data.
       parameters:
         - name: name
           in: path
           required: true
-          description: paste name
           schema:
             type: string
       requestBody:
@@ -184,34 +123,20 @@ paths:
               type: object
               properties:
                 paste:
-                  type: string
-                  description: JSON serialized string of a UpdatePasteModel object.
+                  $ref: '#/components/schemas/UpdatePasteModel'
                 file:
                   type: array
                   items:
                     type: string
                     format: binary
-                  description: Multiple files to upload.
-              required:
-                - paste
       responses:
         '200':
-          description: Update successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
+          description: Paste updated
         '404':
           description: Not found or no update payload
-        '500':
-          description: Wrong password or read-only
-  
-  /api/paste/{name}/delete:
+
     delete:
-      summary: Delete Unlocked Paste
-      description: |
-        Delete a paste by name. This endpoint only works for pastes without password protection. 
-        If a paste is protected, this will return an error.
+      summary: Delete a paste
       parameters:
         - name: name
           in: path
@@ -220,20 +145,12 @@ paths:
             type: string
       responses:
         '200':
-          description: Delete successful.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
-        '500':
-          description: Verification failed (Incorrect password or missing payload).
+          description: Deleted successfully
 
+  /api/paste/{name}/delete:
     post:
-      summary: Delete Locked Paste
-      description: Delete a password-protected paste. The password must be provided in the request body.
+      summary: Delete a locked paste
+      description: Deletes a paste after password verification.
       parameters:
         - name: name
           in: path
@@ -248,99 +165,161 @@ paths:
               $ref: '#/components/schemas/PasswordModel'
       responses:
         '200':
-          description: Delete successful.
+          description: Deleted successfully
+
+  /api/paste/{name}/file/name/{filename}:
+    get:
+      summary: Download paste file
+      description: Download an attachment using an ephemeral token.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          description: Encrypted AuthModel token
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File download
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
+            application/octet-stream:
               schema:
                 type: string
-        '500':
-          description: Verification failed (Incorrect password or missing payload).
+                format: binary
+        '401':
+          description: Token expired or unauthorized
 
+    post:
+      summary: Request download token
+      description: Verify password to receive a redirect with a download token.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordModel'
+      responses:
+        '303':
+          description: Redirecting to download path with token
 
 components:
   schemas:
-    # Core Model: Maps to Zig `Paste` struct
+    Result:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        data:
+          type: object
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
     Paste:
       type: object
       properties:
         id: { type: integer, format: int64, nullable: true }
         name: { type: string, nullable: true }
-        content: { type: string, nullable: true, description: "The actual text body of the paste." }
-        content_type: { type: string, nullable: true, description: "MIME type or language identifier." }
-        attachements: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        content_type: { type: string, nullable: true }
+        attachements: { type: string, nullable: true, description: "Comma separated file IDs" }
         private: { type: boolean, nullable: true }
         read_only: { type: boolean, nullable: true }
         editable: { type: boolean, nullable: true }
-        has_password: { type: boolean, nullable: true, description: "Calculated field indicating protection." }
+        has_password: { type: boolean, nullable: true }
+        password: { type: string, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
         burn_after_reads: { type: integer, format: int64, nullable: true }
-        create_at: { type: integer, format: int64, nullable: true, description: "Unix timestamp." }
-        expiration_at: { type: integer, format: int64, nullable: true, description: "Unix timestamp." }
+        latest_read_at: { type: integer, format: int64, nullable: true }
+        create_at: { type: integer, format: int64, nullable: true }
+        expiration_at: { type: integer, format: int64, nullable: true }
         profiles: { type: string, nullable: true }
 
-    # Summary Model: Maps to Zig `Summary` struct
-    PasteSummary:
+    Summary:
       type: object
       properties:
         id: { type: integer, format: int64, nullable: true }
         name: { type: string, nullable: true }
         content_type: { type: string, nullable: true }
         read_only: { type: boolean, nullable: true }
+        editable: { type: boolean, nullable: true }
         has_password: { type: boolean, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
+        latest_read_at: { type: integer, format: int64, nullable: true }
         create_at: { type: integer, format: int64, nullable: true }
+        expiration_at: { type: integer, format: int64, nullable: true }
 
-    # Pagination Wrapper: Maps to PageList(Summary)
-    PastePage:
+    File:
       type: object
       properties:
-        list:
-          type: array
-          items:
-            $ref: '#/components/schemas/PasteSummary'
-        page_size: { type: integer }
-        page_no: { type: integer }
-        page_count: { type: integer }
-        total: { type: integer, format: int64 }
+        id: { type: integer, format: int64, nullable: true }
+        hash: { type: string, nullable: true }
+        filename: { type: string, nullable: true }
+        filesize: { type: integer, nullable: true }
+        filepath: { type: string, nullable: true }
+        mimetype: { type: string, nullable: true }
 
-    # Request model for locked pastes
+    PasteModel:
+      type: object
+      properties:
+        paste: { $ref: '#/components/schemas/Paste' }
+        files:
+          type: array
+          items: { $ref: '#/components/schemas/File' }
+          nullable: true
+
     PasswordModel:
       type: object
       properties:
         password: { type: string, nullable: true }
 
-    # Request model for update
     UpdatePasteModel:
       type: object
       properties:
-        password:
-          type: string
-          nullable: true
-          description: If paste has password.
-        paste:
-          $ref: '#/components/schemas/Paste'
-      description: Update paste request model
+        password: { type: string, nullable: true }
+        paste: { $ref: '#/components/schemas/Paste' }
 
-    # Generic Result Wrapper: Maps to common.Result.create(T)
-    PasteResult:
-      type: object
-      properties:
-        code: { type: integer, example: 200, description: "Business logic status code." }
-        data:
-          allOf:
-            - $ref: '#/components/schemas/Paste'
-          nullable: true
-        message: { type: string, nullable: true }
+    PasteModelResult:
+      allOf:
+        - $ref: '#/components/schemas/Result'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PasteModel' }
 
     PastePageResult:
-      type: object
-      properties:
-        code: { type: integer, example: 200 }
-        data:
-          allOf:
-            - $ref: '#/components/schemas/PastePage'
-          nullable: true
-        message: { type: string, nullable: true }
+      allOf:
+        - $ref: '#/components/schemas/Result'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items: { $ref: '#/components/schemas/Summary' }
+                page_size: { type: integer }
+                page_no: { type: integer }
+                page_count: { type: integer }
+                total: { type: integer, format: int64 }

@@ -1,114 +1,100 @@
 openapi: 3.0.0
 info:
-  title: Zapaste API
-  description: |
-    基于 Zig 和 Zap 框架构建的粘贴板服务。
-    支持：
-    - 公开粘贴板的分页列表获取
-    - 带有密码保护的粘贴内容读取
-    - 自动脱敏（返回结果自动抹除密码字段）
-    - Raw 原始文本模式输出
+  title: 剪贴板服务 API (Paste Service API)
+  description: 基于 Zig 开发的剪贴板服务，支持文件附件上传及密码保护内容。
   version: 1.0.0
 
 paths:
   /api/paste:
     get:
-      summary: 获取公开粘贴板列表
-      description: 返回所有公开粘贴板的摘要信息。
+      summary: 列出公开的剪贴板内容
+      description: 返回公开剪贴板内容的分页摘要列表。
       parameters:
         - name: page_size
           in: query
-          description: 每页返回的数量，默认 10
+          description: 每页展示的数量
           schema:
             type: integer
             default: 10
         - name: page_no
           in: query
-          description: 当前页码，默认 1
+          description: 当前页码
           schema:
             type: integer
             default: 1
       responses:
         '200':
-          description: 成功返回分页摘要列表
+          description: 成功获取分页摘要列表
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PastePageResult'
-
     post:
-      summary: 创建新粘贴板
-      description: |
-        支持两种方式调用：
-        1. 直接发送 JSON (`application/json`)
-        2. 通过表单字段 `paste` 发送 JSON 字符串 (`application/x-www-form-urlencoded`)
+      summary: 创建新的剪贴板内容
+      description: 创建包含可选文件附件的剪贴板项。支持 JSON 或 Multipart/form-data 格式。
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Paste'
-          application/x-www-form-urlencoded:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 paste:
-                  type: string
-                  description: Paste 对象的 JSON 序列化字符串
-              required:
-                - paste
+                  $ref: '#/components/schemas/Paste'
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
       responses:
         '200':
-          description: 创建成功，返回包含 ID 的完整对象
+          description: 剪贴板内容创建成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasteResult'
+                $ref: '#/components/schemas/PasteModelResult'
 
   /api/paste/{name}:
     get:
-      summary: 获取未加密粘贴版
-      description: 如果粘贴板设有密码，此接口将返回错误。
+      summary: 获取未加密的剪贴板内容
+      description: 通过名称获取没有设置密码保护的剪贴板详情。
       parameters:
         - name: name
           in: path
           required: true
-          description: 粘贴板的唯一名称
+          description: 剪贴板唯一标识名
           schema:
             type: string
         - name: raw
           in: query
-          description: 是否仅获取原始文本内容
+          description: 如果为 true，则仅返回原始文本内容。
           schema:
-            type: string
-            enum: ["true", "false"]
+            type: boolean
       responses:
         '200':
-          description: 成功获取。根据 raw 参数返回 JSON 或纯文本。
+          description: 剪贴板详情或原始文本内容
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasteResult'
+                $ref: '#/components/schemas/PasteModelResult'
             text/plain:
               schema:
                 type: string
         '404':
-          description: 粘贴不存在或名称为空
+          description: 未找到剪贴板或该内容受密码保护
 
     post:
-      summary: 获取加密粘贴板
-      description: 需在 **请求体** 中提供密码。
+      summary: 获取受密码保护的剪贴板内容
+      description: 提供密码以获取受保护的剪贴板详情。
       parameters:
         - name: name
           in: path
           required: true
+          description: 剪贴板唯一标识名
           schema:
             type: string
-        - name: raw
-          in: query
-          schema:
-            type: string
-            enum: ["true", "false"]
       requestBody:
         required: true
         content:
@@ -117,50 +103,18 @@ paths:
               $ref: '#/components/schemas/PasswordModel'
       responses:
         '200':
-          description: 密码正确，返回粘贴板内容
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
+          description: 成功获取剪贴板详情
         '500':
-          description: 验证失败（密码错误或未提供密码）
-
-    delete:
-      summary: 删除未加密粘贴板
-      description: 如果粘贴板设有密码，此接口将返回错误。
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: 删除成功.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
-        '500':
-          description: 密码验证失败, 或者没有提密码
+          description: 密码错误或请求体缺失
 
     put:
-      summary: 更新现有的剪切板
-      description: |
-        通过名称更新剪切板内容。
-        如果剪切板设置了密码，必须在请求体中提供密码。
-        只读的剪切板无法被更新。
+      summary: 更新剪贴板内容
+      description: 更新现有的剪贴板项。如果内容受保护，则需要提供密码。支持 JSON 或 Multipart/form-data 格式。
       parameters:
         - name: name
           in: path
           required: true
-          description: 剪切板的名称
+          description: 剪贴板唯一标识名
           schema:
             type: string
       requestBody:
@@ -169,57 +123,45 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdatePasteModel'
-          application/x-www-form-urlencoded:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 paste:
-                  type: string
-                  description: JSON 格式的 Paste 对象.
-              required:
-                - paste
+                  $ref: '#/components/schemas/UpdatePasteModel'
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
       responses:
         '200':
           description: 更新成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
         '404':
-          description: 未找到贴条或请求负载无效
-        '500':
-          description: 服务器错误（如密码错误或贴条只读)
+          description: 未找到内容或无更新负载
 
-  /api/paste/{name}/delete:
     delete:
-      summary: 删除未加密粘贴板
-      description: 如果粘贴板设有密码，此接口将返回错误。
+      summary: 删除剪贴板内容
       parameters:
         - name: name
           in: path
           required: true
+          description: 剪贴板唯一标识名
           schema:
             type: string
       responses:
         '200':
-          description: 删除成功.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
-              schema:
-                type: string
-        '500':
-          description: 密码验证失败, 或者没有提密码
+          description: 删除成功
 
+  /api/paste/{name}/delete:
     post:
-      summary: 删除带有密码保护的粘贴板
-      description: 删除带有密码保护的粘贴板, 删除时必须提供密码.
+      summary: 删除受密码保护的剪贴板内容
+      description: 在验证密码后删除指定的剪贴板项。
       parameters:
         - name: name
           in: path
           required: true
+          description: 剪贴板唯一标识名
           schema:
             type: string
       requestBody:
@@ -230,98 +172,178 @@ paths:
               $ref: '#/components/schemas/PasswordModel'
       responses:
         '200':
-          description: 删除成功.
+          description: 删除成功
+
+  /api/paste/{name}/file/name/{filename}:
+    get:
+      summary: 下载剪贴板附件
+      description: 使用临时令牌 (Token) 下载附件。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 剪贴板唯一标识名
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          description: 文件名
+          schema:
+            type: string
+        - name: token
+          in: query
+          description: 经过加密的 AuthModel 授权令牌
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 文件下载流
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PasteResult'
-            text/plain:
+            application/octet-stream:
               schema:
                 type: string
-        '500':
-          description: 密码验证失败, 或者没有提密码
+                format: binary
+        '401':
+          description: 令牌过期或未授权
+
+    post:
+      summary: 请求文件下载令牌
+      description: 验证密码以获取带有下载令牌的重定向地址。
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 剪贴板唯一标识名
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          description: 文件名
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordModel'
+      responses:
+        '303':
+          description: 验证成功，重定向至带 Token 的下载路径
 
 components:
   schemas:
-    # 核心模型：对应 Zig 中的 Paste 结构体
+    Result:
+      type: object
+      description: 统一响应结构
+      properties:
+        code:
+          type: integer
+          description: 业务状态码
+          example: 200
+        data:
+          type: object
+          description: 响应数据
+          nullable: true
+        message:
+          type: string
+          description: 响应消息
+          nullable: true
+
     Paste:
       type: object
+      description: 剪贴板核心实体
       properties:
-        id: { type: integer, format: int64, nullable: true }
-        name: { type: string, nullable: true }
-        content: { type: string, nullable: true, description: "粘贴板的文本内容" }
-        content_type: { type: string, nullable: true, description: "粘贴板文本类型" }
-        attachements: { type: string, nullable: true }
-        private: { type: boolean, nullable: true }
-        read_only: { type: boolean, nullable: true }
-        editable: { type: boolean, nullable: true }
-        has_password: { type: boolean, nullable: true }
-        read_count: { type: integer, format: int64, nullable: true }
-        burn_after_reads: { type: integer, format: int64, nullable: true }
-        create_at: { type: integer, format: int64, nullable: true }
-        expiration_at: { type: integer, format: int64, nullable: true }
-        profiles: { type: string, nullable: true }
+        id: { type: integer, format: int64, nullable: true, description: "唯一 ID" }
+        name: { type: string, nullable: true, description: "剪贴板名称/标识" }
+        content: { type: string, nullable: true, description: "文本内容" }
+        content_type: { type: string, nullable: true, description: "内容类型" }
+        attachements: { type: string, nullable: true, description: "逗号分隔的文件 ID 列表" }
+        private: { type: boolean, nullable: true, description: "是否为私有" }
+        read_only: { type: boolean, nullable: true, description: "是否只读" }
+        editable: { type: boolean, nullable: true, description: "是否可编辑" }
+        has_password: { type: boolean, nullable: true, description: "是否有密码保护" }
+        password: { type: string, nullable: true, description: "内容密码" }
+        read_count: { type: integer, format: int64, nullable: true, description: "阅读次数" }
+        burn_after_reads: { type: integer, format: int64, nullable: true, description: "阅后即焚限制次数" }
+        latest_read_at: { type: integer, format: int64, nullable: true, description: "最后阅读时间戳" }
+        create_at: { type: integer, format: int64, nullable: true, description: "创建时间戳" }
+        expiration_at: { type: integer, format: int64, nullable: true, description: "过期时间戳" }
+        profiles: { type: string, nullable: true, description: "配置项/属性" }
 
-    # 摘要模型：对应 Zig 中的 Summary 结构体
-    PasteSummary:
+    Summary:
       type: object
+      description: 剪贴板列表摘要信息
       properties:
         id: { type: integer, format: int64, nullable: true }
         name: { type: string, nullable: true }
         content_type: { type: string, nullable: true }
         read_only: { type: boolean, nullable: true }
+        editable: { type: boolean, nullable: true }
         has_password: { type: boolean, nullable: true }
         read_count: { type: integer, format: int64, nullable: true }
+        latest_read_at: { type: integer, format: int64, nullable: true }
         create_at: { type: integer, format: int64, nullable: true }
+        expiration_at: { type: integer, format: int64, nullable: true }
 
-    # 分页列表封装：对应 PageList(Summary)
-    PastePage:
+    File:
       type: object
+      description: 附件文件信息
       properties:
-        list:
-          type: array
-          items:
-            $ref: '#/components/schemas/PasteSummary'
-        page_size: { type: integer }
-        page_no: { type: integer }
-        page_count: { type: integer }
-        total: { type: integer, format: int64 }
+        id: { type: integer, format: int64, nullable: true }
+        hash: { type: string, nullable: true, description: "文件 Hash 值" }
+        filename: { type: string, nullable: true, description: "文件名" }
+        filesize: { type: integer, nullable: true, description: "文件大小 (字节)" }
+        filepath: { type: string, nullable: true, description: "物理存储路径" }
+        mimetype: { type: string, nullable: true, description: "MIME 类型" }
 
-    # 密码请求模型
+    PasteModel:
+      type: object
+      description: 包含剪贴板详情及其关联文件的组合模型
+      properties:
+        paste: { $ref: '#/components/schemas/Paste' }
+        files:
+          type: array
+          description: 关联的附件列表
+          items: { $ref: '#/components/schemas/File' }
+          nullable: true
+
     PasswordModel:
       type: object
+      description: 密码验证模型
       properties:
-        password: { type: string, nullable: true }
+        password: { type: string, nullable: true, description: "访问密码" }
 
-    # 更新请求模型
     UpdatePasteModel:
       type: object
+      description: 更新剪贴板所需的负载模型
       properties:
-        password:
-          type: string
-          nullable: true
-          description: 如果原剪切板有密码，则需提供此字段进行校验
-        paste:
-          $ref: '#/components/schemas/Paste'
-      description: 更新请求模型
+        password: { type: string, nullable: true, description: "原始或校验密码" }
+        paste: { $ref: '#/components/schemas/Paste' }
 
-    # 通用响应包装：对应 common.Result.create(T)
-    PasteResult:
-      type: object
-      properties:
-        code: { type: integer, example: 200, description: "业务状态码" }
-        data:
-          allOf:
-            - $ref: '#/components/schemas/Paste'
-          nullable: true
-        message: { type: string, nullable: true }
+    PasteModelResult:
+      description: 返回单个剪贴板模型的响应
+      allOf:
+        - $ref: '#/components/schemas/Result'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PasteModel' }
 
     PastePageResult:
-      type: object
-      properties:
-        code: { type: integer, example: 200 }
-        data:
-          allOf:
-            - $ref: '#/components/schemas/PastePage'
-          nullable: true
-        message: { type: string, nullable: true }
+      description: 返回剪贴板分页摘要的响应
+      allOf:
+        - $ref: '#/components/schemas/Result'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items: { $ref: '#/components/schemas/Summary' }
+                page_size: { type: integer, description: "每页数量" }
+                page_no: { type: integer, description: "当前页码" }
+                page_count: { type: integer, description: "总页数" }
+                total: { type: integer, format: int64, description: "总记录数" }
