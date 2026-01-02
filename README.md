@@ -22,6 +22,8 @@ Zapaste is a Pastebin service built using Zig and the Zap web framework.
       - [Enable Swagger](#enable-swagger)
       - [Enable Embed Web Server](#enable-embed-web-server)
       - [Allow CORS Request](#allow-cors-request)
+  - [Global Access Control](#global-access-control)
+    - [Basic Authenticator](#basic-authenticator)
 
 ## Key Features
 
@@ -32,6 +34,8 @@ Zapaste is a Pastebin service built using Zig and the Zap web framework.
 - File upload and download.
 - The same file is stored only once.
 - Download file by CURL directly.
+- Automatic clean outdate pastes.
+- Automatic clean useless files.
 - RESTful API.
 - Self-hosted.
 
@@ -155,6 +159,16 @@ Example configuration file: [default configuration]
 
   - **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access directory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
 
+- **`auth`**: Global login authentication configuration
+
+  - **`auth_type`**: authentication type, There has two auth type: `None` and `Basic`. `None` means no authenticator protect; `Basic` provides basic protection. default `None`
+
+  - **`skip_auth_path`**: this is a key-value map, to control which url path could skip auth verify. The key is url path, you can use `:xxx` to match one variable path, e.g., `/api/paste/:name` can matches `/api/paste/abc` or `/api/paste/def` but not matches `/api/paste/abc/delete`; the value is allow which HTTP method skip auth verify, you cann special multiple HTTP methods by delimiters `,`. e.g.: `"/api/paste/:name": "GET,POST"` means allow everyone access url `/api/paste/xxxxx` by HTTP method `GET` or `POST`. default `null`
+
+  - **`basic`**: Configuration for `Basic` auth_type
+
+    - **`users`**: a key-value map, the key is username, the value is password, default `null`
+
 - **`work_dir`**: the directory data stored. default `./`.
 
 - **`upload_dir`**: the uploaded file stored (Relative path, relative to `work_dir`, if you set `uploads`, then will access directory `${work_dir}/uploads`). default `uploads`
@@ -168,6 +182,10 @@ Example configuration file: [default configuration]
 - **`threads`**: how many threads handle http request. default `2`,
 
 - **`workers`**: how many workers, cannot share memory between workers. default `1`
+
+- **`paste_clean_frequency`**: the frequency of clean outdate pastes (The number of views reaches the set value or the content expires.), time unit is milliseconds, default `3600000` (every 1 hour)
+
+- **`file_clean_frequency`**: the frequency of clean useless files (Files that were not referenced by the pastes), time unit is milliseconds, default `3600000` (every 1 hour)
 
 - **`custom_headers`**: a key-value map, it's will set custom headers for every http request. default `null`
 
@@ -245,6 +263,39 @@ For example, you can allow all CROS OPTIONS request by below configuration:
     "cors_headers": {
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    }
+}
+```
+
+## Global Access Control
+
+You can configure `auth` in `config.json` to let only authenticated users can perform full operations in Zapaste service.
+
+For now only one authenticator is available, that is `Basic` authenticator.
+
+### Basic Authenticator
+
+Basic authenticator is a simple authenticator, it will verify `authorization` header in every http request, and get your username and password from `authorization` header, after then compare your password with your sets in configuration, if the verification is successful then service will continue to handle next step operation, else then will block the request.
+
+`authorization` header format is a base64 encoded string: `$username:$password`. for example: if username `abc`, password `123456` then the `authorization` should be `Basic YWJjOjEyMzQ1Ng==`.
+
+You can configure configuration to add users. there is a config.json example, in this example, we use `Basic` authenticator, and add 2 users: `abc` and `tom`. password of user `abc` is `123456`; `tom`'s is `password`. also i configured `skip_auth_path` to let everyone can access swagger, view public pastes list, view exists pastes (both locked and unlocked) and download files (as same as pastes, both include locked and unlocked).
+
+```json
+"auth": {
+    "auth_type": "Basic",
+    "basic": {
+        "users": {
+            "abc": "123456",
+            "tom": "password"
+        }
+    },
+    "skip_auth_path": {
+        "/swagger": "GET",
+        "/swagger/:any": "GET",
+        "/api/paste": "GET",
+        "/api/paste/:name": "GET,POST",
+        "/api/paste/:name/file/name/:filename": "GET,POST"
     }
 }
 ```
