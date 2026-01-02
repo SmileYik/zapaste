@@ -1,11 +1,13 @@
 const std = @import("std");
 const zap = @import("zap");
+const PathTree = @import("path_tree.zig").PathTree;
+
 const U8Result = @import("result.zig").U8Result;
 const Router = zap.Router;
 
 pub const RouterOptions = struct {
     not_found: ?zap.HttpRequestFn = null,
-    interceptors: ?[]const zap.HttpRequestFn = null,
+    interceptors: ?[]zap.HttpRequestFn = null,
 };
 
 pub const RouterError = error {
@@ -82,7 +84,6 @@ pub const VariableRouter = struct {
 
         /// get path variables. if it's not matches then will return null.
         pub fn get_variables(self: *const VariablePath, gpa: std.mem.Allocator, path: []const u8) !?std.StringHashMap([]const u8) {
-            if (!self.matches(path)) return null;
             var variables = std.StringHashMap([]const u8).init(gpa);
             var iter = std.mem.splitSequence(u8, path, "/");
             var variable_idx: usize = 0;
@@ -121,7 +122,9 @@ pub const VariableRouter = struct {
         callback: Callback
     };
 
-    routes: std.ArrayList(Record),
+    const PTree = PathTree(Record);
+
+    routes: *PTree,
     not_found: ?zap.HttpRequestFn = null,
     inner_router: Router,
 
@@ -130,7 +133,7 @@ pub const VariableRouter = struct {
     pub fn init(allocator: std.mem.Allocator, options: RouterOptions) !*VariableRouter {
         var router = try allocator.create(VariableRouter);
         router.* = .{
-            .routes = try std.ArrayList(Record).initCapacity(allocator, 16),
+            .routes = try PTree.init(.{ .allocator = allocator }),
             .not_found = options.not_found orelse null,
             .inner_router = undefined
         };
@@ -164,7 +167,8 @@ pub const VariableRouter = struct {
             return;
         }
 
-        try self.routes.append(allocator, .{
+        _ = allocator;
+        try self.routes.put_pattern(path, .{
             .path = VariablePath.init(path),
             .callback = .{
                 .unbound = @intFromPtr(h)
@@ -185,8 +189,9 @@ pub const VariableRouter = struct {
         if (path.len == 0) {
             return;
         }
-
-        try self.routes.append(allocator, .{
+        
+        _ = allocator;
+        try self.routes.put_pattern(path, .{
             .path = VariablePath.init(path),
             .callback = .{
                 .bound = .{
@@ -199,6 +204,7 @@ pub const VariableRouter = struct {
 
     pub fn deinit(self: *VariableRouter) void {
         defer self.inner_router.deinit();
+        defer self.routes.deinit();
     }
 
     pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
@@ -223,11 +229,10 @@ pub const VariableRouter = struct {
         const path = r.path orelse "/";
         var target: ?Record = null;
         var path_variables: ?std.StringHashMap([]const u8) = null;
-        for (self.routes.items) |route| {
+        if (self.routes.find_path(path)) |route| {
             if (try route.path.get_variables(gpa, path)) |map| {
                 path_variables = map;
                 target = route;
-                break;
             }
         }
 
@@ -275,12 +280,13 @@ pub const WrapperRouter = struct {
         return r;
     }
 
-    pub fn deinit(self: *WrapperRouter) void {
+    pub fn deinit(self: *WrapperRouter, allocator: std.mem.Allocator) void {
         var iter = self.router_map.valueIterator();
         while (iter.next()) |r| {
             r.*.deinit();
         }
         self.router_map.deinit();
+        allocator.destroy(self);
     }
 
     pub fn special(self: *WrapperRouter, allocator: std.mem.Allocator, method: zap.http.Method) !*VariableRouter {

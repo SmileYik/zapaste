@@ -41,7 +41,8 @@ fn set_custom_header(headers: ?std.StringHashMap([]const u8), r: zap.Request) !v
 var options: Options = undefined;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_type = std.heap.DebugAllocator(.{ .thread_safe = true });
+    var gpa = gpa_type.init;
     defer {
         std.debug.print("Checking memory leak...\n", .{});
         if (gpa.deinit() == .leak) {
@@ -63,6 +64,12 @@ pub fn main() !void {
     };
     defer options.deinit();
 
+    var interceptors = try std.ArrayList(zap.HttpRequestFn).initCapacity(gpa_allocator, 4);
+    defer interceptors.deinit(gpa_allocator);
+
+    try interceptors.append(gpa_allocator, custom_header_handler);
+    try interceptors.append(gpa_allocator, cors_handler);
+
     if (!(zapaste.paste.init_paste(allocator, &options) catch |e| b: {
         std.debug.print("Failed initlization paste module: {}", .{e});
         break :b false;
@@ -71,18 +78,15 @@ pub fn main() !void {
         std.debug.print("Failed initlization file module: {}", .{e});
         break :b false;
     })) return;
-
-    var router: *WrapperRouter = WrapperRouter.init(allocator, .{
+    
+    var router: *WrapperRouter = WrapperRouter.init(gpa_allocator, .{
         .not_found = on_not_found,
-        .interceptors = &[_]zap.HttpRequestFn {
-            &custom_header_handler,
-            &cors_handler
-        }
+        .interceptors = interceptors.items[0..]
     }) catch |e| {
         std.debug.print("Web router initialize failed: {}", .{e});
         return;
     };
-    defer router.deinit();
+    defer router.deinit(gpa_allocator);
 
     try zapaste.common.StaticController.init(gpa_allocator, router, &options);
     const swagger_controller = try zapaste.swagger.SwaggerController.init(

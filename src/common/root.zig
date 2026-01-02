@@ -20,6 +20,8 @@ pub const ZapParamsFinder = @import("zap_params_finder.zig");
 
 pub const ase_util = @import("aes_utils.zig");
 
+pub const path_tree = @import("path_tree.zig");
+
 test {
     @import("std").testing.refAllDecls(@This());
 }
