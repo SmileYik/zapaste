@@ -28,6 +28,6 @@ pub fn register_paste_cleaner(allocator: Allocator, paste_service: *PasteService
     const timer = try PasteCleanerTimer.init(allocator, .{
         .paste_service = paste_service
     });
-    try timer.run_every(options.paste_clean_frequency, 0);
+    try timer.run_every(@intCast(options.paste_clean_frequency), 0);
     std.debug.print("Clean Paste every {}s\n", .{ options.paste_clean_frequency / 1000 });
 }

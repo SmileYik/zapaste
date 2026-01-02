@@ -29,6 +29,6 @@ pub fn register_file_cleaner(allocator: Allocator, file_service: *FileService, o
         .file_service = file_service,
         .allocator = allocator
     });
-    try timer.run_every(options.file_clean_frequency, 0);
+    try timer.run_every(@intCast(options.file_clean_frequency), 0);
     std.debug.print("Clean File every {}s\n", .{ options.file_clean_frequency / 1000 });
 }
