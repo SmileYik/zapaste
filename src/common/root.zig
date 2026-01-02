@@ -22,6 +22,8 @@ pub const ase_util = @import("aes_utils.zig");
 
 pub const path_tree = @import("path_tree.zig");
 
+pub const fio_timer = @import("fio_timer.zig");
+
 test {
     @import("std").testing.refAllDecls(@This());
 }
