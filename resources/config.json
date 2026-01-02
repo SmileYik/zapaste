@@ -2,6 +2,19 @@
     "dao_type": "Sqlite",
     "work_dir": "./",
     "upload_dir": "uploads",
+    "auth": {
+        "auth_type": "None",
+        "basic": {
+            "users": null
+        },
+        "skip_auth_path": {
+            "/swagger": "GET",
+            "/swagger/:any": "GET",
+            "/api/paste": "GET",
+            "/api/paste/:name": "GET,POST",
+            "/api/paste/:name/file/name/:filename": "GET,POST"
+        }
+    },
     "sqlite_options": {
         "memory_mode": false,
         "pool_size": 2,

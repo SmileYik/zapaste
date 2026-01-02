@@ -41,6 +41,22 @@ fn set_custom_header(headers: ?std.StringHashMap([]const u8), r: zap.Request) !v
 var options: Options = undefined;
 
 pub fn main() !void {
+    // const gpa_allocator, const debug_gpa: ?std.heap.DebugAllocator(.{ .thread_safe = true }) = 
+    // if (builtin.mode == .Debug) b: {
+    //     const gpa_type = std.heap.DebugAllocator(.{ .thread_safe = true });
+    //     var gpa = gpa_type.init;
+    //     break :b .{ gpa.allocator(), gpa };
+    // } else b: {
+    //     break :b .{ std.heap.smp_allocator, null };
+    // };
+    // defer if (debug_gpa) |gpa| {
+    //     var var_gpa = gpa;
+    //     std.debug.print("Checking memory leak...\n", .{});
+    //     if (var_gpa.deinit() == .leak) {
+    //         std.debug.print("Memory leak detected!\n", .{});
+    //     }
+    // };
+    
     const gpa_type = std.heap.DebugAllocator(.{ .thread_safe = true });
     var gpa = gpa_type.init;
     defer {
@@ -67,6 +83,10 @@ pub fn main() !void {
     var interceptors = try std.ArrayList(zap.HttpRequestFn).initCapacity(gpa_allocator, 4);
     defer interceptors.deinit(gpa_allocator);
 
+    defer zapaste.auth.deinit_auth();
+    if (try zapaste.auth.init_auth(gpa_allocator, &options)) |req| {
+        try interceptors.append(gpa_allocator, req);
+    }
     try interceptors.append(gpa_allocator, custom_header_handler);
     try interceptors.append(gpa_allocator, cors_handler);
 

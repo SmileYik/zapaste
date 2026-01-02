@@ -5,6 +5,7 @@ pub const common = @import("common");
 pub const swagger = @import("swagger");
 pub const res = @import("res");
 pub const file = @import("file");
+pub const auth = @import("auth");
 
 pub fn get_config(allocator: std.mem.Allocator, file_path: ?[]const u8) !common.Options {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);

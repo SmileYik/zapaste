@@ -9,7 +9,33 @@ pub const DaoType = enum {
     Sqlite
 };
 
+pub const AuthType = enum { 
+    Basic,
+    None
+};
+
 pub const Options = struct {
+
+    pub const JsonAuthBasicOptions = struct {
+        users: ?std.json.Value = null,
+    };
+
+    pub const AuthBasicOptions = struct {
+        users: ?StringHashMap = null,
+    };
+
+    pub const JsonAuthOptions = struct {
+        auth_type: ?AuthType = .None,
+        basic: ?JsonAuthBasicOptions = JsonAuthBasicOptions {},
+        skip_auth_path: ?std.json.Value = null,
+    };
+
+    pub const AuthOptions = struct {
+        auth_type: ?AuthType = .None,
+        basic: ?AuthBasicOptions = AuthBasicOptions {},
+        skip_auth_path: ?StringHashMap = null,
+    };
+
     pub const JsonWebOptions = struct {
         enable: ?bool = false,
         default_file: ?[]const u8 = null,
@@ -100,6 +126,7 @@ pub const Options = struct {
         cors_headers: ?std.json.Value = null,
         swagger: ?JsonSwaggerOptions = JsonSwaggerOptions {},
         web: ?JsonWebOptions = JsonWebOptions {},
+        auth: ?JsonAuthOptions = JsonAuthOptions {},
     };
 
     dao_type: DaoType,
@@ -116,6 +143,7 @@ pub const Options = struct {
     cors_headers: ?StringHashMap = null,
     swagger: ?SwaggerOptions = SwaggerOptions {},
     web: ?WebOptions = WebOptions {},
+    auth: ?AuthOptions = AuthOptions {},
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
         return std.fmt.allocPrint(gpa, "{s}/{s}", .{ self.work_dir.?, path }) catch |e| {
@@ -152,7 +180,15 @@ pub const Options = struct {
         options.sqlite_options.?.pool_size = opt.sqlite_options.?.pool_size orelse default_sqlite_opt.pool_size;
         options.sqlite_options.?.shared_cache = opt.sqlite_options.?.shared_cache orelse default_sqlite_opt.shared_cache;
         options.sqlite_options.?.pragma = try json_obj_to_string_map(gpa,opt.sqlite_options.?.pragma);
+
+        const auth_opt = AuthOptions {};
+        options.auth.?.auth_type = opt.auth.?.auth_type orelse auth_opt.auth_type;
+        options.auth.?.skip_auth_path = try json_obj_to_string_map(gpa, opt.auth.?.skip_auth_path);
+        options.auth.?.basic.?.users = try json_obj_to_string_map(gpa, opt.auth.?.basic.?.users);
+
+        // copy strings 
         options.work_dir = try dupe_str(options.work_dir, "/app", gpa);
+        options.upload_dir = try dupe_str(options.upload_dir, "uploads", gpa);
 
         if (opt.swagger) |s| {
             options.swagger.?.enable = s.enable;
