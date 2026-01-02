@@ -127,6 +127,8 @@ pub const Options = struct {
         swagger: ?JsonSwaggerOptions = JsonSwaggerOptions {},
         web: ?JsonWebOptions = JsonWebOptions {},
         auth: ?JsonAuthOptions = JsonAuthOptions {},
+        paste_clean_frequency: ?u64 = @intCast(60 * 60 * 1000),
+
     };
 
     dao_type: DaoType,
@@ -139,6 +141,8 @@ pub const Options = struct {
     enable_log: ?bool = true,
     threads: ?u16 = 2,
     workers: ?u16 = 1,
+    paste_clean_frequency: u64 = @intCast(60 * 60 * 1000),
+
     custom_headers: ?StringHashMap = null,
     cors_headers: ?StringHashMap = null,
     swagger: ?SwaggerOptions = SwaggerOptions {},
@@ -153,6 +157,7 @@ pub const Options = struct {
     }
 
     pub fn init(gpa: Allocator, opt: JsonOptions) anyerror!Options {
+        const default_opt = Options { .dao_type = .Sqlite };
         var options: Options = .{
             .dao_type = opt.dao_type orelse DaoType.Sqlite,
             .work_dir = opt.work_dir,
@@ -161,8 +166,8 @@ pub const Options = struct {
             .enable_log = opt.enable_log,
             .threads = opt.threads,
             .workers = opt.workers,
+            .paste_clean_frequency = opt.paste_clean_frequency orelse default_opt.paste_clean_frequency
         };
-        const default_opt = Options { .dao_type = options.dao_type };
         options.work_dir = options.work_dir orelse default_opt.work_dir;
         options.sqlite_options = options.sqlite_options orelse default_opt.sqlite_options;
         options.bind_port = options.bind_port orelse default_opt.bind_port;

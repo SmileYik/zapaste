@@ -99,6 +99,14 @@ pub const PasteService = struct {
         }
         const paste = try self.find_paste(gpa, query.name.?);
         if (paste) |p| {
+            // check time
+            if (p.expiration_at) |expiration| {
+                if (expiration <= @as(u64, @intCast(std.time.timestamp()))) {
+                    return null;
+                }
+            }
+
+            // check password
             if (try check_paste_password(gpa, &p, query.password)) {
                 self.increase_read_count(p) catch |e| {
                     std.log.debug("[PasteService] failed increase read count: {}", .{e});
@@ -223,6 +231,19 @@ pub const PasteService = struct {
     }
 
     pub fn increase_read_count(self: *Self, paste: Paste) !void {
+        if (paste.read_count) |count| {
+            if (paste.burn_after_reads) |limit| {
+                if (limit != 0 and count + 1 >= limit) {
+                    if (paste.id) |id| {
+                        _ = try self.dao.?.delete_paste(id);
+                        return;
+                    } else if (paste.name) |name| {
+                        _ = try self.dao.?.delete_paste_by_name(name);
+                        return;
+                    }
+                }
+            }
+        }
         try self.dao.?.increase_read_count(paste);
     }
 
@@ -237,6 +258,10 @@ pub const PasteService = struct {
         return try self.dao.?.page_summary_pastes(
             allocator, .{ .private = false }, page_no, page_size
         );
+    }
+
+    pub fn clean_paste(self: *Self) !void {
+        try self.dao.?.clean_paste();
     }
 };
 

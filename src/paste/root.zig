@@ -3,6 +3,7 @@ pub const PasteDao = @import("paste_dao.zig").PasteDao;
 pub const SqlitePasteDao = @import("paste_dao.zig").SqlitePasteDao;
 pub const PasteService = @import("paste_service.zig").PasteService;
 pub const PasteController = @import("paste_controller.zig");
+pub const PasteCleaner = @import("paste_cleaner.zig");
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;

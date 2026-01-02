@@ -37,14 +37,18 @@ pub fn FIOTimer(comptime T: type) type {
         fn task_callback(arg: ?*anyopaque) callconv(.c) void {
             if (arg) |ptr| {
                 var data: *Self = @ptrCast(@alignCast(ptr));
-                data.t.task_callback();
+                data.t.task_callback() catch |e| {
+                    std.debug.print("Throws error when run timer task: {}", .{e});
+                };
             }
         }
 
         fn finish_callback(arg: ?*anyopaque) callconv(.c) void {
             if (arg) |ptr| {
                 var data: *Self = @ptrCast(@alignCast(ptr));
-                data.t.finish_callback();
+                data.t.finish_callback() catch |e| {
+                    std.debug.print("Throws error when run timer task: {}", .{e});
+                };
                 data.deinit();
             }
         }

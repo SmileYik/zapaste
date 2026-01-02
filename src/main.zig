@@ -127,6 +127,8 @@ pub fn main() !void {
     };
     defer paste_controller.deinit();
 
+    try zapaste.paste.PasteCleaner.register_paste_cleaner(gpa_allocator, zapaste.paste.get_paste_service().?, &options);
+
     paste_controller.register(allocator, router, "/api/paste")
     catch |e| {
         std.debug.print("PasteController register failed: {}", .{e});

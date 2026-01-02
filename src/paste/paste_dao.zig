@@ -357,9 +357,9 @@ pub const SqlitePasteDao = struct {
 
         const sql =
             \\DELETE FROM paste WHERE
-            \\(burn_after_reads IS NOT NULL AND read_count > burn_after_reads)
+            \\(burn_after_reads IS NOT NULL AND read_count >= burn_after_reads)
             \\OR
-            \\(expiration_at IS NOT NULL AND expiration_at > ?)
+            \\(expiration_at IS NOT NULL AND expiration_at < ?)
         ;
         var stmt = try conn.get_db().prepare(sql);
         defer stmt.deinit();
