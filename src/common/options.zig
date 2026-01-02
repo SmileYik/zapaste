@@ -128,7 +128,7 @@ pub const Options = struct {
         web: ?JsonWebOptions = JsonWebOptions {},
         auth: ?JsonAuthOptions = JsonAuthOptions {},
         paste_clean_frequency: ?u64 = @intCast(60 * 60 * 1000),
-
+        file_clean_frequency: ?u64 = @intCast(60 * 60 * 1000),
     };
 
     dao_type: DaoType,
@@ -142,6 +142,7 @@ pub const Options = struct {
     threads: ?u16 = 2,
     workers: ?u16 = 1,
     paste_clean_frequency: u64 = @intCast(60 * 60 * 1000),
+    file_clean_frequency: u64 = @intCast(60 * 60 * 1000),
 
     custom_headers: ?StringHashMap = null,
     cors_headers: ?StringHashMap = null,
@@ -166,7 +167,8 @@ pub const Options = struct {
             .enable_log = opt.enable_log,
             .threads = opt.threads,
             .workers = opt.workers,
-            .paste_clean_frequency = opt.paste_clean_frequency orelse default_opt.paste_clean_frequency
+            .paste_clean_frequency = opt.paste_clean_frequency orelse default_opt.paste_clean_frequency,
+            .file_clean_frequency = opt.file_clean_frequency orelse default_opt.file_clean_frequency,
         };
         options.work_dir = options.work_dir orelse default_opt.work_dir;
         options.sqlite_options = options.sqlite_options orelse default_opt.sqlite_options;

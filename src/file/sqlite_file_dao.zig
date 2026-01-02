@@ -58,7 +58,8 @@ pub fn init(self: *Self) FileDao {
         .delete_file_fn = delete_file,
         .delete_file_by_hash_fn = delete_file_by_hash,
         .list_file_by_ids_fn = list_file_by_ids,
-        .list_file_by_ids_string_fn = list_file_by_ids_string
+        .list_file_by_ids_string_fn = list_file_by_ids_string,
+        .delete_useless_file_fn = delete_useless_file
     };
 }
 
@@ -182,6 +183,30 @@ fn delete_file_by_hash(ptr: *anyopaque, hash: []const u8) anyerror!void {
     var stmt = try conn.get_db().prepare(sql);
     defer stmt.deinit();
     try stmt.exec(.{}, .{ .hash = hash });
+}
+
+fn delete_useless_file(ptr: *anyopaque, allocator: Allocator, batch: usize) anyerror!?[][]const u8 {
+    const sql = 
+        \\DELETE FROM file WHERE id IN (
+        \\  SELECT f.id FROM file f WHERE NOT EXISTS (
+        \\    SELECT 1 FROM paste p
+        \\    WHERE (',' || p.attachements || ',') LIKE ('%,' || f.id || ',%')
+        \\  )
+        \\  LIMIT ?
+        \\)
+        \\RETURNING hash
+    ;
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const conn = try self.pool.get_connection();
+    defer conn.release();
+    var stmt = try conn.get_db().prepare(sql);
+    defer stmt.deinit();
+    return try stmt.all(
+        []const u8,
+        allocator,
+        .{},
+        .{ batch },
+    );
 }
 
 inline fn memory_dao(allocator: Allocator) !FileDao {

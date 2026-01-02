@@ -61,6 +61,49 @@ pub fn get_file_disk_path(self: *Self, allocator: Allocator, hash: []const u8) !
     return try self.get_file_path(allocator, hash);
 }
 
+pub fn clean_files(self: *Self, allocator: Allocator) !void {
+    var a = std.heap.ArenaAllocator.init(allocator);
+    defer a.deinit();
+    const alloc = a.allocator();
+
+    while (true) {
+        const list: ?[][]const u8 = try self.dao.delete_useless_file(alloc, 100);
+        if (list) |l| {
+            if (l.len == 0) break;
+            for (l) |item| {
+                const store_path = self.get_file_path(alloc, item) catch {
+                    continue;
+                };
+                delete_file_and_empty_parents(store_path) catch |e| {
+                    std.debug.print("failed to clean file '{s}': {}\n", .{ store_path, e });
+                    continue;
+                };
+            }
+        }
+    }
+}
+
+inline fn delete_file_and_empty_parents(path: []const u8) !void {
+    try std.fs.cwd().deleteFile(path);
+
+    var parent_path = std.fs.path.dirname(path);
+
+    while (parent_path) |p| {
+        if (p.len == 0 or std.mem.eql(u8, p, ".")) break;
+
+        std.fs.cwd().deleteDir(p) catch |err| {
+            switch (err) {
+                error.DirNotEmpty => break,
+                error.AccessDenied => return err,
+                error.FileNotFound => break,
+                else => return err,
+            }
+        };
+
+        parent_path = std.fs.path.dirname(p);
+    }
+}
+
 inline fn get_file_path(self: *Self, allocator: Allocator, filename: []const u8) ![]const u8 {
     return std.fmt.allocPrint(allocator, "{s}/{s}/{s}/{s}", .{
         self.store_path, filename[0..2], filename[2..4], filename
@@ -74,4 +117,3 @@ inline fn file_hash(allocator: Allocator, bytes: []const u8) ![]const u8 {
         std.fmt.bytesToHex(hash, .upper)
     });
 }
-// std.crypto.hash.sha2.Sha512

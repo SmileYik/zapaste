@@ -14,6 +14,7 @@ delete_file_fn: *const fn (ptr: *anyopaque, id: u64) anyerror!void,
 delete_file_by_hash_fn: *const fn (ptr: *anyopaque, hash: []const u8) anyerror!void,
 list_file_by_ids_fn: *const fn (ptr: *anyopaque, allocator: Allocator, ids: []const u64) anyerror!?[]File,
 list_file_by_ids_string_fn: *const fn (ptr: *anyopaque, allocator: Allocator, ids: []const u8) anyerror!?[]File,
+delete_useless_file_fn: *const fn (ptr: *anyopaque, allocator: Allocator, batch: usize) anyerror!?[][]const u8,
 
 pub fn create_table_if_not_exists(self: Self) anyerror!void {
     return self.create_table_if_not_exists_fn(self.ptr);
@@ -45,4 +46,8 @@ pub fn delete_file(self: Self, id: u64) anyerror!void {
 
 pub fn delete_file_by_hash(self: Self, hash: []const u8) anyerror!void {
     return self.delete_file_by_hash_fn(self.ptr, hash);
+}
+
+pub fn delete_useless_file(self: Self, allocator: Allocator, batch: usize) anyerror!?[][]const u8 {
+    return self.delete_useless_file_fn(self.ptr, allocator, batch);
 }
