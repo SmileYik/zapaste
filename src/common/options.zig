@@ -257,6 +257,7 @@ pub const Options = struct {
         defer if (self.custom_headers != null) deinit_string_map(&self.custom_headers.?);
         defer if (self.cors_headers != null) deinit_string_map(&self.cors_headers.?);
         defer if (self.sqlite_options != null and self.sqlite_options.?.pragma != null) deinit_string_map(&self.sqlite_options.?.pragma.?);
+        defer if (self.auth != null and self.auth.?.skip_auth_path != null) deinit_string_map(&self.auth.?.skip_auth_path.?);
     }
 };
 
