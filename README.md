@@ -1,6 +1,8 @@
 # Zapaste
 
-Zapaste is a Pastebin service built using Zig and the Zap web framework.
+Zapaste is a pastebin-like service built using Zig and the Zap web framework.
+
+[English](#zapaste) | [中文](./README.zh.md)
 
 ## Content
 
