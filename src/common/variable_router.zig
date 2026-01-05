@@ -127,12 +127,14 @@ pub const VariableRouter = struct {
     routes: *PTree,
     not_found: ?zap.HttpRequestFn = null,
     inner_router: Router,
+    allocator: std.mem.Allocator,
 
     var _instance: *VariableRouter = undefined;
     
     pub fn init(allocator: std.mem.Allocator, options: RouterOptions) !*VariableRouter {
         var router = try allocator.create(VariableRouter);
         router.* = .{
+            .allocator = allocator,
             .routes = try PTree.init(.{ .allocator = allocator }),
             .not_found = options.not_found orelse null,
             .inner_router = undefined
@@ -203,8 +205,9 @@ pub const VariableRouter = struct {
     }
 
     pub fn deinit(self: *VariableRouter) void {
-        defer self.inner_router.deinit();
-        defer self.routes.deinit();
+        self.inner_router.deinit();
+        self.routes.deinit();
+        self.allocator.destroy(self);
     }
 
     pub fn on_request_handler(self: *VariableRouter) zap.HttpRequestFn {
