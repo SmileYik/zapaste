@@ -4,10 +4,10 @@ Zapaste 是由 Zig 编程语言和 Zap 网页框架制作的一个类 pastebin �
 
 [English](./README.md) | [中文](#zapaste)
 
-## Content
+## 目录
 
 - [Zapaste](#zapaste)
-  - [Content](#content)
+  - [目录](#目录)
   - [主要功能](#主要功能)
   - [FAQ](#faq)
   - [构建](#构建)
@@ -162,6 +162,8 @@ Zapaste 每一个配置项都含有默认值, 你可以单独修改你想要的�
   - **`prefix`**: 静态网页请求路径前缀, 默认为 `/`
 
   - **`static_path`**: 静态资源目录路径 (这是相对位置, 相对于 `work_dir` 目录, 如果你设置的值为 `static`, 那么实际访问的目录路径为 `${work_dir}/static`; 如果你设置的值为 `web/static`, 那么实际将访问 `${work_dir}/web/static`). 默认值为 `static`
+
+  - **`compression_static`**: 如果存在压缩文件，则自动发送压缩后的静态文件。程序会首先尝试查找 **Brotli** 格式的压缩文件(文件后缀为 **.br**)，然后是 **gzip** 格式(文件后缀为 **.gz**)，最后才会发送原始文件。默认值为 `false`。
 
 - **`auth`**: 全局登陆验证配置
 

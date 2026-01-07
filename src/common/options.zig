@@ -41,6 +41,7 @@ pub const Options = struct {
         default_file: ?[]const u8 = null,
         prefix: ?[]const u8 = null,
         static_path: ?[]const u8 = null,
+        compression_static: ?bool = false,
     };
 
     pub const WebOptions = struct {
@@ -48,6 +49,7 @@ pub const Options = struct {
         default_file: []const u8 = "",
         prefix: []const u8 = "",
         static_path: []const u8 = "",
+        compression_static: bool = false,
     };
 
     pub const JsonSwaggerOptions = struct {
@@ -219,6 +221,7 @@ pub const Options = struct {
             if (web.static_path) |s| {
                 conf.static_path = try dupe_str(s, "static", gpa);
             }
+            conf.compression_static = web.compression_static orelse false;
         }
 
         if (options.dao_type == DaoType.Sqlite) {

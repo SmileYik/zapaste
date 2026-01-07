@@ -33,7 +33,8 @@
         "enable": false,
         "default_file": "index.html",
         "prefix": "/",
-        "static_path": "static"
+        "static_path": "static",
+        "compression_static": false
     },
     "bind_port": 3000,
     "max_clients": 100000,

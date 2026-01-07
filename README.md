@@ -161,6 +161,8 @@ Example configuration file: [default configuration]
 
   - **`static_path`**: static resources path (Relative path, relative to `work_dir`, if you set `static`, then will access directory `${work_dir}/static`; if you set `web/static` then `${work_dir}/web/static`). default `static`
 
+  - **`compression_static`**: automatic send compressed static file if it's exists, will try to find **brotli** at first (file name suffix is **.br**), then **gzip** (file name suffix is **.gz**), orignal file is the end. default `false`
+
 - **`auth`**: Global login authentication configuration
 
   - **`auth_type`**: authentication type, There has two auth type: `None` and `Basic`. `None` means no authenticator protect; `Basic` provides basic protection. default `None`
