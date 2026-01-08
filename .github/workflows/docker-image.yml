@@ -54,6 +54,10 @@ jobs:
           type=semver,pattern={{version}}
           latest
 
+    - name: Lowercase repository name
+      run: |
+        echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
 
@@ -84,4 +88,4 @@ jobs:
         file: ./Dockerfile-zapaste-ui
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:embedded-ui
+          ghcr.io/${{ env.REPO_LOWER }}:embedded-ui
