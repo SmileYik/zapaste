@@ -415,17 +415,16 @@ inline fn handle_receive_paste(self: *Self, allocator: Allocator, req: zap.Reque
 } {
     const no_valid_payload = comptime PasteResult.init(500, null, "Not a valid payload or content-type");
 
-    if (req.body == null) {
-        result_no_password.send_json(req, strip_null_field);
-        return .{ null, null };
-    }
-
     const content_type = req.getHeaderCommon(.content_type);
     if (content_type) |ct| {
         const paste_json: ?[] const u8 = 
         if (std.ascii.eqlIgnoreCase("application/json", ct)) req.body
         else blk: {
-            try req.parseBody();
+            req.parseBody() catch |e| {
+                const result = try PasteResult.failed(allocator, e, "IO Buffer Error: failed to parse request body.");
+                result.send_json(req, strip_null_field);
+                return .{ null, null };
+            };
             break :blk try common.ZapParamsFinder.get_string(allocator, req, "paste");
         };
 
