@@ -96,8 +96,21 @@ pub fn find_params(allocator: Allocator, r: zap.Request) !?std.ArrayList([]const
         }
     };
     _ = fio.fiobj_each1(r.h.*.params, 0, Self.callback, &context);
-    if (context.last_error) |e| return e;
+
+    if (context.last_error) |e| {
+        if (context.task.GetParams.result) |*list|
+            free_find_params_result(allocator, list);
+        return e;
+    }
     return context.task.GetParams.result;
+}
+
+/// free the result of find_params method.
+pub fn free_find_params_result(allocator: Allocator, list: *std.ArrayList([]const u8)) void {
+    for (list.items) |item| {
+        allocator.free(item);
+    }
+    list.*.deinit(allocator);
 }
 
 /// get request param value as string, need to free.
