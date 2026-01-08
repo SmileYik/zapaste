@@ -10,6 +10,7 @@ on:
       - '.github/workflows/docker-image.yml'
       - '.dockerignore'
       - 'Dockerfile'
+      - 'Dockerfile-zapaste-ui'
   pull_request:
     branches: [ "master" ]
     paths:
@@ -19,6 +20,7 @@ on:
       - '.github/workflows/docker-image.yml'
       - '.dockerignore'
       - 'Dockerfile'
+      - 'Dockerfile-zapaste-ui'
     
 permissions:
   contents: read
@@ -65,3 +67,21 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Build and push (Backend Only Image)
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Build and push (Embedded UI Image)
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./Dockerfile-zapaste-ui
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:embedded-ui

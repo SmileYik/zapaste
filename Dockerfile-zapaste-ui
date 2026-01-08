@@ -1,0 +1,46 @@
+FROM debian:trixie-slim AS builder
+
+ARG ZIG_VERSION=0.15.2
+ARG ZIG_URL=https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz
+
+ARG NODEJS_VERSION=v24.12.0
+ARG NODEJS_URL=https://nodejs.org/dist/${NODEJS_VERSION}/node-${NODEJS_VERSION}-linux-x64.tar.xz
+
+WORKDIR /build
+ADD . .
+
+RUN apt-get update && apt-get -y install wget xz-utils git && \
+    cd /build && \
+    wget -O zig.tar.xz "${ZIG_URL}" && \
+    tar -xf zig.tar.xz && \
+    export PATH="$PATH:$(pwd)/zig-x86_64-linux-${ZIG_VERSION}" && \
+    zig init && zig build -Doptimize=ReleaseFast -Dtarget=x86_64-linux-musl && \
+    mkdir /app && \
+    cp /build/zig-out/bin/zapaste /app/ && \
+    cp /build/resources/config.json /app/
+
+RUN cd /build && \
+    mkdir zapaste-ui && \
+    cd zapaste-ui && \
+    wget -O nodejs.tar.xz "${NODEJS_URL}" && \
+    tar -xf nodejs.tar.xz && \
+    export PATH="$PATH:$(pwd)/node-${NODEJS_VERSION}-linux-x64/bin" && \
+    git clone https://github.com/SmileYik/zapaste-ui && \
+    cd zapaste-ui && \
+    npm install && \
+    npm run build:embedded && \
+    mv dist /static && \
+    sed -i '/"web": {/,/}/ s/"enable": false/"enable": true/' /app/config.json && \
+    sed -i '/"web": {/,/}/ s/"compression_static": false/"compression_static": true/' /app/config.json && \
+    sed -i '/"web": {/,/}/ s/"static_path": "static"/"static_path": "..\/static"/' /app/config.json
+
+
+FROM gcr.io/distroless/static-debian13
+
+WORKDIR /app
+COPY --from=builder /app /app
+COPY --from=builder /static /static
+
+EXPOSE 3000
+
+ENTRYPOINT ["/app/zapaste", "/app/config.json"]
