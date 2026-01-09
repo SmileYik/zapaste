@@ -62,6 +62,7 @@ pub fn deinit_auth() void {
 }
 
 fn authentocator_handler(r: zap.Request) !void {
+    if (r.methodAsEnum() == .OPTIONS) return;
     if (r.path) |path| {
         if (skip_auth_path.find_path(path)) |allows| {
             if (r.method) |method| {
