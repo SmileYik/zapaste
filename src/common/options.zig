@@ -54,13 +54,13 @@ pub const Options = struct {
 
     pub const JsonSwaggerOptions = struct {
         enable: ?bool = false,
-        swagger_config_path: ?[]const u8 = "/openapi.yml",
+        swagger_config_path: ?[]const u8 = "openapi.yml",
         swagger_index_path: ?[]const u8 = null,
     };
 
     pub const SwaggerOptions = struct {
         enable: ?bool = false,
-        swagger_config_path: ?[]const u8 = "/openapi.yml",
+        swagger_config_path: ?[]const u8 = "openapi.yml",
         swagger_index_path: ?[]const u8 = null,
     };
 
@@ -155,6 +155,12 @@ pub const Options = struct {
     auth: ?AuthOptions = AuthOptions {},
 
     pub fn get_path(self: *Options, gpa: Allocator, path: []const u8, comptime fallback_path: []const u8) []const u8 {
+        if (std.mem.startsWith(u8, path, "/")) {
+            return gpa.dupe(u8, path) catch |e| {
+                std.debug.print("Out of memery when get path: {any}", .{e});
+                return fallback_path;
+            };
+        }
         return std.fmt.allocPrint(gpa, "{s}/{s}", .{ self.work_dir.?, path }) catch |e| {
             std.debug.print("Out of memery when get path: {any}", .{e});
             return fallback_path;
@@ -205,10 +211,10 @@ pub const Options = struct {
         if (opt.swagger) |s| {
             options.swagger.?.enable = s.enable;
             if (s.swagger_config_path) |p| {
-                options.swagger.?.swagger_config_path = try dupe_str(p, "/openapi.yml", gpa);
+                options.swagger.?.swagger_config_path = try dupe_str(p, "openapi.yml", gpa);
             }
             if (s.swagger_index_path) |p| {
-                options.swagger.?.swagger_index_path = try dupe_str(p, "/swagger.html", gpa);
+                options.swagger.?.swagger_index_path = try dupe_str(p, "swagger.html", gpa);
             }
         }
 
@@ -242,7 +248,7 @@ pub const Options = struct {
         const mode = if (sql_opt.memory_mode orelse false) blk: {
             break :blk sqlite.Db.Mode.Memory;
         } else blk: {
-            const path = options.get_path(temp_allocator, "/database.db", "/app/database.db");
+            const path = options.get_path(temp_allocator, "database.db", "/app/database.db");
             const path_z = try allocator.dupeZ(u8, path);
             break :blk sqlite.Db.Mode{ .File = path_z };
         };

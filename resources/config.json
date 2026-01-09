@@ -26,7 +26,7 @@
     },
     "swagger": {
         "enable": false,
-        "swagger_config_path": "/openapi.yml",
+        "swagger_config_path": "openapi.yml",
         "swagger_index_path": null
     },
     "web": {
