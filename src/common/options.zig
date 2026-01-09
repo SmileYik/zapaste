@@ -120,6 +120,7 @@ pub const Options = struct {
 
         /// how many workers, cannot share memory between workers.
         workers: ?u16 = 1,
+        max_body_size: ?usize = @intCast(1024 * 1024 * 50),
 
         /// custom headers for all http request
         custom_headers: ?std.json.Value = null,
@@ -145,6 +146,7 @@ pub const Options = struct {
     workers: ?u16 = 1,
     paste_clean_frequency: u64 = @intCast(60 * 60 * 1000),
     file_clean_frequency: u64 = @intCast(60 * 60 * 1000),
+    max_body_size: usize = @intCast(1024 * 1024 * 50),
 
     custom_headers: ?StringHashMap = null,
     cors_headers: ?StringHashMap = null,
@@ -171,6 +173,7 @@ pub const Options = struct {
             .workers = opt.workers,
             .paste_clean_frequency = opt.paste_clean_frequency orelse default_opt.paste_clean_frequency,
             .file_clean_frequency = opt.file_clean_frequency orelse default_opt.file_clean_frequency,
+            .max_body_size = opt.max_body_size orelse default_opt.max_body_size,
         };
         options.work_dir = options.work_dir orelse default_opt.work_dir;
         options.sqlite_options = options.sqlite_options orelse default_opt.sqlite_options;

@@ -42,6 +42,8 @@
     "threads": 2,
     "workers": 1,
     "paste_clean_frequency": 3600000,
+    "file_clean_frequency": 3600000,
+    "max_body_size": 52428800,
     "custom_headers": {
         "Access-Control-Allow-Origin": "*"
     },

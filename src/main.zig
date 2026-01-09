@@ -141,6 +141,7 @@ pub fn main() !void {
         .on_request = router.on_request_handler(),
         .log = options.enable_log.?,
         .max_clients = options.max_clients.?,
+        .max_body_size = options.max_body_size,
     });
     try listener.listen();
 

@@ -191,6 +191,8 @@ Example configuration file: [default configuration]
 
 - **`file_clean_frequency`**: the frequency of clean useless files (Files that were not referenced by the pastes), time unit is milliseconds, default `3600000` (every 1 hour)
 
+- **`max_body_size`**: the max http request body payload, unit **byte**, default `52428800` (50MB)
+
 - **`custom_headers`**: a key-value map, it's will set custom headers for every http request. default `null`
 
 - **`cors_headers`**: a key-value map. it's will set headers for every `OPTIONS` http requset, default `null`
