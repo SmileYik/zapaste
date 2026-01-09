@@ -32,7 +32,7 @@ RUN cd /build && \
     mv dist /static && \
     sed -i '/"web": {/,/}/ s/"enable": false/"enable": true/' /app/config.json && \
     sed -i '/"web": {/,/}/ s/"compression_static": false/"compression_static": true/' /app/config.json && \
-    sed -i '/"web": {/,/}/ s/"static_path": "static"/"static_path": "..\/static"/' /app/config.json
+    sed -i '/"web": {/,/}/ s/"static_path": "static"/"static_path": "\/static"/' /app/config.json
 
 
 FROM gcr.io/distroless/static-debian13

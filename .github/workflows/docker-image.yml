@@ -9,8 +9,7 @@ on:
       - 'build.*'
       - '.github/workflows/docker-image.yml'
       - '.dockerignore'
-      - 'Dockerfile'
-      - 'Dockerfile-zapaste-ui'
+      - 'docker/*'
   pull_request:
     branches: [ "master" ]
     paths:
@@ -19,8 +18,7 @@ on:
       - 'build.*'
       - '.github/workflows/docker-image.yml'
       - '.dockerignore'
-      - 'Dockerfile'
-      - 'Dockerfile-zapaste-ui'
+      - 'docker/*'
     
 permissions:
   contents: read
@@ -76,7 +74,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./Dockerfile
+        file: ./docker/Dockerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -85,7 +83,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./Dockerfile-zapaste-ui
+        file: ./docker/Dockerfile-zapaste-ui
         push: true
         tags: |
           ghcr.io/${{ env.REPO_LOWER }}:embedded-ui
