@@ -127,15 +127,15 @@ pub fn main() !void {
     };
     defer paste_controller.deinit();
 
-    const paste_clean_timer = try zapaste.paste.PasteCleaner.register_paste_cleaner(
-        gpa_allocator, zapaste.paste.get_paste_service().?, &options
+    _ = try zapaste.paste.PasteCleaner.register_paste_cleaner(
+        allocator, zapaste.paste.get_paste_service().?, &options
     );
-    defer paste_clean_timer.deinit();
+    // defer paste_clean_timer.deinit();
     
-    const file_clean_timer = try zapaste.file.FileCleaner.register_file_cleaner(
-        gpa_allocator, zapaste.file.get_file_service().?, &options
+    _ = try zapaste.file.FileCleaner.register_file_cleaner(
+        allocator, zapaste.file.get_file_service().?, &options
     );
-    defer file_clean_timer.deinit();
+    // defer file_clean_timer.deinit();
 
     paste_controller.register(allocator, router, "/api/paste")
     catch |e| {
