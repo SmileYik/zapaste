@@ -1,6 +1,8 @@
 # Zapaste
 
-Zapaste 是由 Zig 编程语言和 Zap 网页框架制作的一个类 pastebin 的在线剪切板服务.
+Zapaste 是由 Zig 编程语言和 Zap 网页框架制作的一个类 pastebin 的在线剪切板服务. 
+
+由于这是我第一次接触 Zig 语言时所制作的, 包括 Zig 语法和编码风格都是在制作这个软件时边学边做的, 所以在一些编码规范的问题上还请见谅.
 
 [English](./README.md) | [中文](#zapaste)
 
@@ -47,6 +49,27 @@ Zapaste 是由 Zig 编程语言和 Zap 网页框架制作的一个类 pastebin �
   - 它并不能直接在 Windows 上运行, 但是能够通过 wsl2 或者是 docker 容器运行.
 - Q: Zapaste 是否支持文件上传与下载?
   - 对, 它现在基本支持文件的上传与下载, 你可以查看它的Swagger API文档.
+- Q: Zapaste 只有 API 接口吗?
+  - 是的, Zapaste 是一个仅包含 API 接口的软件服务器, 不包含任何可视化界面. 如果需要可视化界面, 可以查看 [Zapaste UI][zapaste-ui]
+
+## 可视化界面
+
+Zapaste 项目本身**并不包含任何可视化界面**, 因为按照我个人给它的定位来说, Zapaste 理应是一个后端软件服务器, 仅应该提供相关功能的API接口.
+
+当然, 对于如果你需要可视化界面的话, 有以下选择.
+
+### Zapaste UI
+
+[Zapaste UI][zapaste-ui] 是基于 Vite 和 React 所构建的 Material Design 3 风格的 Web 前端可视化界面, 并且支持移动端界面布局.
+
+在 Zapaste 构建 docker 镜像时, 会额外构建一个 tag 为 `embedded-ui` 的 docker 镜像, 该镜像集成 Zapaste UI, 并且默认打开 Zapaste 的内嵌 Web 服务器.
+
+你仅需要运行以下指令就可以运行它, 之后可以直接通过浏览器进入地址 `http://localhost:3000` 打开可视化界面:
+
+```shell
+docker pull ghcr.io/smileyik/zapaste:embedded-ui
+docker run -p 3000:3000 -it --rm ghcr.io/smileyik/zapaste:embedded-ui
+```
 
 ## 构建
 
@@ -313,3 +336,4 @@ Basic 验证器是一个非常简单的验证器, 它将去校验所有 http 请
 [swagger configuration]: ./resources/swagger/openapi.yml
 [zig action]: https://github.com/SmileYik/zapaste/actions/workflows/zig.yml
 [online swagger editor]: https://editor.swagger.io/?url=https://raw.githubusercontent.com/SmileYik/zapaste/refs/heads/master/resources/swagger/openapi.zh.yml
+[zapaste-ui]: https://github.com/SmileYik/zapaste-ui

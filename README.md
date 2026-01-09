@@ -2,6 +2,8 @@
 
 Zapaste is a pastebin-like service built using Zig and the Zap web framework.
 
+This project was my first experience with the Zig programming language. As I was learning the syntax and coding styles throughout the development process, please excuse any inconsistencies regarding Zig's idiomatic practices or coding standards.
+
 [English](#zapaste) | [中文](./README.zh.md)
 
 ## Content
@@ -47,6 +49,27 @@ Zapaste is a pastebin-like service built using Zig and the Zap web framework.
   - Can not directly work on Windows, but it can work on wsl2 or a docker container.
 - Q: Does support upload/download files?
   - Basic support now, you can view swagger api.
+- Q: Does Zapaste only provided HTTP API?
+  - Yes, Zapaste only provides an HTTP API, it does not include any visual interface. If you need a visual interface, you can use [Zapaste UI][zapaste-ui].
+
+## Visual interface
+
+The Zapaste project itself **does not include any graphical user interface**, because, according to my personal vision for it, Zapaste should be a backend software server, only providing HTTP API interfaces.
+
+Of course, if you need a graphical user interface, you have the following options.
+
+### Zapaste UI
+
+[Zapaste UI][zapaste-ui] is a Material Design 3-style web front-end visual interface built with Vite and React, and it also supports mobile device layouts.
+
+When building the Zapaste Docker image, an additional Docker image with the tag `embedded-ui` is built. This image integrates Zapaste UI and automatically starts Zapaste's embedded web server.
+
+You only need to run the following command to run it, and then you can access the visual interface directly through your browser at `http://localhost:3000`:
+
+```shell
+docker pull ghcr.io/smileyik/zapaste:embedded-ui
+docker run -p 3000:3000 -it --rm ghcr.io/smileyik/zapaste:embedded-ui
+```
 
 ## Build
 
@@ -310,3 +333,4 @@ You can configure configuration to add users. there is a config.json example, in
 [swagger configuration]: ./resources/swagger/openapi.yml
 [zig action]: https://github.com/SmileYik/zapaste/actions/workflows/zig.yml
 [online swagger editor]: https://editor.swagger.io/?url=https://raw.githubusercontent.com/SmileYik/zapaste/refs/heads/master/resources/swagger/openapi.yml
+[zapaste-ui]: https://github.com/SmileYik/zapaste-ui
