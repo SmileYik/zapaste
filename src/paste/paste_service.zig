@@ -51,6 +51,9 @@ pub const PasteService = struct {
 
         const has_name = paste.name != null;
         var entity: Paste = try paste.dupe(temp_gpa);
+        if (entity.name != null and entity.name.?.len == 0) {
+            entity.name = null;
+        }
         entity.name = entity.name orelse try self.random_animal_name(temp_gpa);
         entity.profiles = entity.profiles orelse "{}";
         entity.create_at = @intCast(std.time.timestamp());
