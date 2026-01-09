@@ -570,7 +570,7 @@ inline fn handle_download_paste_file(
     allocator: Allocator,
     paste_name: []const u8, 
     password: ?[]const u8, 
-    filename_url_encoded: []const u8, 
+    filename: []const u8, 
     req: zap.Request
 ) !void {
     const find_result = self.service.?.read_paste(allocator, .{
@@ -580,11 +580,6 @@ inline fn handle_download_paste_file(
         (try PasteResult.failed(allocator, e, "failed to read.")).send_json(req, strip_null_field);
         return;
     };
-    
-    const filename_buf: []u8 = try allocator.alloc(u8, filename_url_encoded.len);
-    defer allocator.free(filename_buf);
-    @memcpy(filename_buf, filename_url_encoded);
-    const filename =std.Uri.percentDecodeInPlace(filename_buf);
 
     if (find_result) |paste| {
         const paste_model = try PasteModel.init(self, allocator, paste);

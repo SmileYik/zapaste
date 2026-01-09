@@ -24,11 +24,12 @@ const FileCleaner = struct {
 
 const FileCleanerTimer = common.fio_timer.FIOTimer(FileCleaner);
 
-pub fn register_file_cleaner(allocator: Allocator, file_service: *FileService, options: *common.Options) !void {
+pub fn register_file_cleaner(allocator: Allocator, file_service: *FileService, options: *common.Options) !*common.fio_timer.FIOTimer(FileCleaner) {
     const timer = try FileCleanerTimer.init(allocator, .{
         .file_service = file_service,
         .allocator = allocator
     });
     try timer.run_every(@intCast(options.file_clean_frequency), 0);
     std.debug.print("Clean File every {}s\n", .{ options.file_clean_frequency / 1000 });
+    return timer;
 }

@@ -19,6 +19,20 @@ pub const RouterError = error {
 pub const VariableRouter = struct {
 
     const VariablePath = struct {
+
+        pub const PathVariables = struct {
+            variables: std.StringHashMap([]const u8),
+            allocator: std.mem.Allocator,
+
+            pub fn deinit(self: *PathVariables) void {
+                var iter = self.variables.valueIterator();
+                while (iter.next()) |next| {
+                    self.allocator.free(next.*);
+                }
+                self.*.variables.deinit();
+            }
+        };
+
         paths: []const []const u8,
         variable_idxes: []const usize,
 
@@ -83,7 +97,7 @@ pub const VariableRouter = struct {
         }
 
         /// get path variables. if it's not matches then will return null.
-        pub fn get_variables(self: *const VariablePath, gpa: std.mem.Allocator, path: []const u8) !?std.StringHashMap([]const u8) {
+        pub fn get_variables(self: *const VariablePath, gpa: std.mem.Allocator, path: []const u8) !?PathVariables {
             var variables = std.StringHashMap([]const u8).init(gpa);
             var iter = std.mem.splitSequence(u8, path, "/");
             var variable_idx: usize = 0;
@@ -93,11 +107,20 @@ pub const VariableRouter = struct {
                 const v_idx = self.variable_idxes[variable_idx];
                 if (idx == v_idx) {
                     variable_idx += 1;
-                    try variables.put(self.paths[idx][1..], line);
+
+                    const decode_buf: []u8 = try gpa.alloc(u8, line.len);
+                    defer gpa.free(decode_buf);
+                    @memcpy(decode_buf, line);
+                    const decoded =std.Uri.percentDecodeInPlace(decode_buf);
+
+                    try variables.put(self.paths[idx][1..], try gpa.dupe(u8, decoded));
                 }
                 idx += 1;
             }
-            return variables;
+            return .{
+                .variables = variables,
+                .allocator = gpa,
+            };
         }
     };
     
@@ -231,13 +254,14 @@ pub const VariableRouter = struct {
 
         const path = r.path orelse "/";
         var target: ?Record = null;
-        var path_variables: ?std.StringHashMap([]const u8) = null;
+        var path_variables: ?VariablePath.PathVariables = null;
         if (self.routes.find_path(path)) |route| {
             if (try route.path.get_variables(gpa, path)) |map| {
                 path_variables = map;
                 target = route;
             }
         }
+        defer if (path_variables) |*p| p.*.deinit();
 
         if (target) |record| {
             switch (record.callback) {
@@ -245,18 +269,17 @@ pub const VariableRouter = struct {
                     try @call(
                         .auto, 
                         @as(BoundHandler, @ptrFromInt(b.handler)), 
-                        .{ @as(*anyopaque, @ptrFromInt(b.instance)), path_variables.?, r }
+                        .{ @as(*anyopaque, @ptrFromInt(b.instance)), path_variables.?.variables, r }
                     );
                 },
                 .unbound => |h| {
                     try @call(
                         .auto,
                         @as(UnboundHandler, @ptrFromInt(h)),
-                        .{ path_variables.?, r }
+                        .{ path_variables.?.variables, r }
                     );
                 },
             }
-            path_variables.?.deinit();
         } else if (self.not_found) |handler| {
             try handler(r);
         } else {
