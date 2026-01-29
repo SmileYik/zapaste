@@ -138,7 +138,8 @@ fn list_file_by_ids_string(ptr: *anyopaque, allocator: Allocator, ids: []const u
     const conn = try self.pool.get_connection();
     defer conn.release();
 
-    const sql = try std.fmt.allocPrint(allocator, SELECT_SQL ++ " WHERE file.id IN ({s}) ", .{ ids });
+    const trimed_ids = std.mem.trim(u8, ids, " ,");
+    const sql = try std.fmt.allocPrint(allocator, SELECT_SQL ++ " WHERE file.id IN ({s}) ", .{ trimed_ids });
 
     var stmt = try conn.get_db().prepareDynamic(sql);
     defer stmt.deinit();
