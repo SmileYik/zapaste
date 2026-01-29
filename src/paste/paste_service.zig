@@ -181,8 +181,6 @@ pub const PasteService = struct {
                 var attachements = try std.ArrayList(u8).initCapacity(temp_gpa, 1024);
                 defer attachements.deinit(temp_gpa);
                 {
-                    var ids = try std.ArrayList([]const u8).initCapacity(temp_gpa, 1024);
-                    defer ids.deinit(temp_gpa);
                     var old_set = std.StringHashMap(bool).init(temp_gpa);
                     defer old_set.deinit();
                     var set = std.StringHashMap(bool).init(temp_gpa);
@@ -194,35 +192,36 @@ pub const PasteService = struct {
                             try old_set.put(id, true);
                         }
 
-                        if (entity.attachements) |new_attach| {
-                            var new = std.mem.splitAny(u8, new_attach, ",");
-                            while (new.next()) |id| {
-                                if (old_set.contains(id) and !set.contains(id)) {
-                                    try set.put(id, true);
-                                    try attachements.append(temp_gpa, ',');
-                                    try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id });
-                                }
-                            }
-                        } else {
-                            var old_iter = old_set.keyIterator();
-                            while (old_iter.next()) |id| {
-                                try set.put(id.*, true);
-                                try attachements.append(temp_gpa, ',');
-                                try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id.* });
-                            }
-                        }
-                    }
-                    if (new_attachements) |new_attach| {
-                        var new = std.mem.splitAny(u8, new_attach, ",");
-                        while (new.next()) |id| {
-                            if (!set.contains(id)) {
+                        // received attachement ids, find uploaded files
+                        const new_attachmens = entity.attachements orelse old_attach;
+                        var new = std.mem.splitAny(u8, new_attachmens, ",");
+                        while (new.next()) |id_| {
+                            const id = std.mem.trim(u8, id_, "");
+                            if (
+                                id.len > 0 and
+                                old_set.contains(id) and 
+                                !set.contains(id)
+                            ) {
                                 try set.put(id, true);
                                 try attachements.append(temp_gpa, ',');
                                 try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id });
                             }
                         }
                     }
-                    real_attachements = if (attachements.items.len > 0) attachements.items[1..] else "";
+
+                    if (new_attachements) |new_attach| {
+                        var new = std.mem.splitAny(u8, new_attach, ",");
+                        while (new.next()) |id_| {
+                            const id = std.mem.trim(u8, id_, "");
+                            if (id.len > 0 and !set.contains(id)) {
+                                try set.put(id, true);
+                                try attachements.append(temp_gpa, ',');
+                                try std.fmt.format(attachements.writer(temp_gpa), "{s}", .{ id });
+                            }
+                        }
+                    }
+                    
+                    real_attachements = std.mem.trim(u8, attachements.items, ", ");
                 }
                 entity.attachements = real_attachements;
                 
