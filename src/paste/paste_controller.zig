@@ -589,8 +589,11 @@ inline fn handle_download_paste_file(
                 if (f.filename) |fname| {
                     if (std.mem.eql(u8, fname, filename)) {
                         const filepath = try self.file_service.?.get_file_disk_path(allocator, f.hash.?);
-                        if (f.mimetype) |mimetype| {
+                        const mimetype = f.mimetype orelse "";
+                        if (std.mem.trim(u8, mimetype, " \r\n").len > 0) {
                             try req.setHeader("content-type", mimetype);
+                        } else {
+                            try req.setContentTypeFromFilename(filename);
                         }
                         try req.sendFile(filepath);
                         return;
